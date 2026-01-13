@@ -1,11 +1,8 @@
-디시 크롤링 + 구글시트 자동 저장 (복붙용)
+# 디시 + 오르비 + 네이버카페 통합 크롤링 + 구글시트 자동 저장
 # ============================================================
-# [Colab 통합] 디시인사이드 크롤링(날짜 입력) -> Google Sheet 자동 저장
-# - 본문 추출(모바일 강제) 포함
-# - URL 화이트/블랙리스트 필터 포함
-# - 중복 제거(URL 기준) + 커스텀 정렬 포함
-# - gspread DeprecationWarning 제거(최신 update 규격)
-# - pandas Categorical 미사용(업로드/결측치 TypeError 방지)
+# [Colab 통합] 다중 사이트 크롤링 -> Google Sheet 자동 저장
+# - 대상: 디시인사이드, 오르비, 수만휘(네이버), 포만한(네이버)
+# - 기능: 사이트별 검색, 본문 추출, 날짜 필터링, 통합 저장
 # ============================================================
 
 !pip -q install gspread google-auth google-auth-oauthlib google-auth-httplib2 pandas bs4 lxml
@@ -16,7 +13,7 @@ import random
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote, urlparse, parse_qs
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -24,52 +21,48 @@ from urllib3.util.retry import Retry
 import gspread
 from google.colab import auth
 from google.auth import default
+import logging
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 # =========================
-# 1) Google Sheet 설정 (URL 고정)
+# 1) 설정 (URL 및 키워드)
 # =========================
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1RM3VNmM8_mW_MDCzp8lsko38KFVE5-5Hq5ImpLeYeQU/edit?gid=0#gid=0"
 INPUT_SHEET_NAME = "📂 원본_데이터_입력"
 HEADERS = ["월", "일", "커뮤니티", "타사명/키워드", "제목", "본문(내용)", "URL"]
 
-
-# =========================
-# 2) 크롤링 설정
-# =========================
 SEARCH_KEYWORDS = [
     "러셀", "대성", "이투스", "메가", "재종",
     "관리형독서실", "관독", "시대인재", "독학재수", "기숙학원"
 ]
 
-CUSTOM_SORT_ORDER = [
-    "러셀", "대성", "이투스", "메가", "재종",
-    "관리형독서실", "관독", "시대인재", "독학재수", "기숙학원", "기타"
-]
-SORT_RANK = {k: i for i, k in enumerate(CUSTOM_SORT_ORDER)}
+# 네이버 카페 정보 (cafeId)
+NAVER_CAFES = {
+    "수만휘": "10139480",
+    "포만한": "14387405"
+}
 
-TARGET_URL_KEYWORDS = [
-    "russelmg", "hanmath", "itall", "exam_new2",
-    "csatlecture", "sdijn", "dshw", "etoos",
-    "kanganedu", "hwatwo", "waterlee1"
-]
-
-EXCLUDE_URL_KEYWORDS = [
-    "whiskey", "americanbasketball", "jumbos", "jworg",
-    "volleyballman", "nasdaq", "stockus", "tenbagger",
-    "krstock", "sls", "loleague1", "of", "formula1",
-    "dow100", "m2liquidity", "w_entertainer", "bigbangvip",
-    "aichatting", "flowerroad", "hiphop_new1", "daesung", "blackwhites2"
-]
-
+# 공통 설정
 FETCH_BODY = True
 BODY_MAX_CHARS = 5000
-POST_DELAY = (0.5, 1.2)
-MAX_PAGES_PER_KEYWORD = 50
+POST_DELAY = (1.5, 3.0)  # 서버 부하 방지를 위해 딜레이 상향
+MAX_PAGES_PER_KEYWORD = 10 
+
+# URL 필터링 (디시용)
+TARGET_URL_KEYWORDS = ["russelmg", "hanmath", "itall", "exam_new2", "csatlecture", "sdijn", "dshw", "etoos", "kanganedu", "hwatwo", "waterlee1"]
+EXCLUDE_URL_KEYWORDS = ["whiskey", "americanbasketball", "jumbos", "jworg", "volleyballman", "nasdaq", "stockus", "tenbagger", "krstock", "sls", "loleague1", "of", "formula1", "dow100", "m2liquidity", "w_entertainer", "bigbangvip", "aichatting", "flowerroad", "hiphop_new1", "daesung", "blackwhites2"]
 
 
 # =========================
-# 3) Google Sheet 유틸 (경고 제거 + append)
+# 2) 유틸리티 함수
 # =========================
 def connect_gsheet():
     auth.authenticate_user()
@@ -78,307 +71,270 @@ def connect_gsheet():
 
 def extract_spreadsheet_id(url: str) -> str:
     m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", url)
-    if not m:
-        raise ValueError("스프레드시트 ID를 URL에서 찾지 못했습니다.")
+    if not m: raise ValueError("스프레드시트 ID를 찾지 못했습니다.")
     return m.group(1)
 
-def open_spreadsheet(gc: gspread.Client, url: str):
-    sid = extract_spreadsheet_id(url)
-    return gc.open_by_key(sid)
-
-def get_or_create_worksheet(sh, title: str, rows: int = 2000, cols: int = 20):
-    try:
-        ws = sh.worksheet(title)
-    except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title=title, rows=rows, cols=cols)
-    return ws
-
 def ensure_header(ws, headers):
-    current = ws.row_values(1)
-    if current[:len(headers)] != headers:
-        ws.resize(rows=max(ws.row_count, 2), cols=max(ws.col_count, len(headers)))
-        ws.update([headers], "A1")  # ✅ values 먼저, range 나중
-        try:
-            ws.format("A1:G1", {"textFormat": {"bold": True}, "horizontalAlignment": "CENTER"})
-        except Exception:
-            pass
-
-def append_dataframe(ws, df: pd.DataFrame, headers):
-    # 컬럼 정합성
-    for h in headers:
-        if h not in df.columns:
-            df[h] = ""
-    df2 = df[headers].copy()
-
-    # 문자열화 + NaN 안전 처리
-    for col in df2.columns:
-        df2[col] = df2[col].astype(str)
-    df2 = df2.fillna("")
-
-    # append 시작 행
-    last_row = len(ws.get_all_values())  # 헤더 포함
-    start_row = last_row + 1 if last_row >= 1 else 1
-
-    values = df2.values.tolist()
-    if not values:
-        print("업로드할 데이터가 없습니다.")
-        return
-
-    cell_range = f"A{start_row}"
-    ws.update(values, cell_range)  # ✅ values 먼저, range 나중
-    print(f"업로드 완료: {len(values)}행 → {ws.title}!{cell_range}부터")
-
-
-# =========================
-# 4) 크롤링 유틸
-# =========================
-def clean_text(text: str) -> str:
-    if not text:
-        return ""
-    text = text.strip()
-    text = re.sub(r'[\u200b\u3000]', ' ', text)
-    text = re.sub(r'[\r\n]+', '\n', text)
-    return text
+    try:
+        current = ws.row_values(1)
+        if current[:len(headers)] != headers:
+            ws.update([headers], "A1")
+    except: pass
 
 def build_session() -> requests.Session:
     s = requests.Session()
+    # 500 에러 등에 대한 재시도 로직 강화
     retry = Retry(
-        total=3, backoff_factor=1,
+        total=5, 
+        backoff_factor=1, 
         status_forcelist=[500, 502, 503, 504],
         allowed_methods=["GET"]
     )
     s.mount("https://", HTTPAdapter(max_retries=retry))
     s.headers.update({
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Connection": "keep-alive",
-        "Referer": "https://m.dcinside.com/"
+        "Cache-Control": "max-age=0",
+        "Connection": "keep-alive"
     })
     return s
 
-def is_valid_url(link: str) -> bool:
-    if not link:
-        return False
-    for exc in EXCLUDE_URL_KEYWORDS:
-        if exc in link:
-            return False
-    if TARGET_URL_KEYWORDS:
-        return any(tgt in link for tgt in TARGET_URL_KEYWORDS)
-    return True
-
-def parse_id_no(link: str):
-    try:
-        u = urlparse(link)
-        q = parse_qs(u.query)
-        gid = q.get("id", [None])[0]
-        no = q.get("no", [None])[0]
-
-        if not gid or not no:
-            parts = [p for p in u.path.split('/') if p]
-            if len(parts) >= 3 and parts[0] == "board":
-                gid, no = parts[1], parts[2]
-        return gid, no
-    except:
-        return None, None
-
-def convert_to_mobile_url(link: str) -> str:
-    gid, no = parse_id_no(link)
-    if gid and no:
-        return f"https://m.dcinside.com/board/{gid}/{no}"
-    return link
-
-def extract_body_mobile(html: str) -> str:
-    if not html:
-        return ""
-    if "삭제된 게시물" in html:
-        return "[삭제된 게시물]"
-    if "존재하지 않는 게시물" in html:
-        return "[존재하지 않는 게시물]"
-
-    soup = BeautifulSoup(html, "lxml")
-    selectors = ["div.thum-txt", "div.thum-txtin", "div.writing_view_box", "div.view_content_wrap"]
-
-    body_el = None
-    for sel in selectors:
-        body_el = soup.select_one(sel)
-        if body_el:
-            break
-    if not body_el:
-        return ""
-
-    for tag in body_el.select("script, style, img, video, iframe, .recomm_btn_box"):
-        tag.decompose()
-
-    text = body_el.get_text("\n", strip=True)
-    return clean_text(text)[:BODY_MAX_CHARS]
-
-def fetch_post_body(session: requests.Session, link: str) -> str:
-    url = convert_to_mobile_url(link)
-    try:
-        time.sleep(random.uniform(*POST_DELAY))
-        r = session.get(url, timeout=10)
-        if r.status_code == 200:
-            return extract_body_mobile(r.text)
-        return ""
-    except:
-        return ""
+def clean_text(text: str) -> str:
+    if not text: return ""
+    text = re.sub(r'[\u200b\u3000]', ' ', text.strip())
+    return re.sub(r'[\r\n]+', '\n', text)
 
 def parse_date(date_str: str) -> datetime:
     now = datetime.now()
     s = (date_str or "").strip()
-
-    m = re.search(r'(\d{4})\.(\d{1,2})\.(\d{1,2})', s)
-    if m:
-        y, mo, d = map(int, m.groups())
-        return datetime(y, mo, d)
-
-    m = re.search(r'(\d{1,2})\.(\d{1,2})', s)
-    if m:
-        mo, d = map(int, m.groups())
-        dt = datetime(now.year, mo, d)
-        if dt > now:
-            dt = dt.replace(year=now.year - 1)
-        return dt
-
-    if ":" in s:
-        return datetime(now.year, now.month, now.day)
-
+    if not s: return now
+    try:
+        # "14:24" 등 시간 형식
+        if ':' in s and len(s) <= 5: 
+            return datetime(now.year, now.month, now.day)
+        # "2시간 전" 등 상대 형식
+        if '시간 전' in s:
+            hours = int(re.search(r'(\d+)', s).group(1))
+            return now - timedelta(hours=hours)
+        if '분 전' in s:
+            return now
+        # "2024.12.30" 또는 "24.12.30"
+        m = re.search(r'(\d{2,4})\.(\d{1,2})\.(\d{1,2})', s)
+        if m:
+            y = int(m.group(1))
+            if y < 100: y += 2000
+            return datetime(y, int(m.group(2)), int(m.group(3)))
+        # "12.30"
+        m = re.search(r'(\d{1,2})\.(\d{1,2})', s)
+        if m:
+            dt = datetime(now.year, int(m.group(1)), int(m.group(2)))
+            return dt if dt <= now else dt.replace(year=now.year - 1)
+    except: pass
     return now
 
 
 # =========================
-# 5) 날짜 입력 → 크롤링 → 구글시트 저장
+# 3) 사이트별 수집 로직
 # =========================
-def get_user_cutoff_date():
-    while True:
-        print("\n" + "=" * 60)
-        print("예시: 2026-01-05 입력 시, 2026-01-05(포함) ~ 현재(오늘)까지 수집합니다.")
-        date_input = input("📅 언제까지(해당 날짜 포함 이후)를 수집할까요? (YYYY-MM-DD)\n👉 입력: ").strip()
-        if not date_input:
-            print("⚠️ 날짜를 입력해주세요.")
-            continue
+
+# 3-1) 디시인사이드
+def fetch_dc_inside(session, keyword, cutoff_dt):
+    results = []
+    print(f"   [디시인사이드] 키워드: {keyword}")
+    for page in range(1, MAX_PAGES_PER_KEYWORD + 1):
+        url = f"https://search.dcinside.com/post/p/{page}/sort/date/q/{quote(keyword)}"
         try:
-            return datetime.strptime(date_input, "%Y-%m-%d")
-        except ValueError:
-            print("❌ 형식이 올바르지 않습니다.")
+            time.sleep(random.uniform(*POST_DELAY))
+            resp = session.get(url, timeout=12)
+            if resp.status_code != 200: break
+            soup = BeautifulSoup(resp.text, "html.parser")
+            posts = soup.select(".sch_result_list > li")
+            if not posts: break
+            
+            for post in posts:
+                date_tag, title_tag = post.select_one("span.date_time"), post.select_one("a.tit_txt")
+                if not date_tag or not title_tag: continue
+                p_date = parse_date(date_tag.text)
+                if p_date < cutoff_dt: return results
+                
+                link = title_tag.get("href", "")
+                if any(x in link for x in EXCLUDE_URL_KEYWORDS): continue
+                if TARGET_URL_KEYWORDS and not any(x in link for x in TARGET_URL_KEYWORDS): continue
+                
+                body = ""
+                if FETCH_BODY:
+                    try:
+                        m_link = link
+                        m = re.search(r"id=([^&]+)&no=(\d+)", link)
+                        if m: m_link = f"https://m.dcinside.com/board/{m.group(1)}/{m.group(2)}"
+                        b_resp = session.get(m_link, timeout=10)
+                        b_soup = BeautifulSoup(b_resp.text, "lxml")
+                        body_el = b_soup.select_one("div.thum-txt, div.writing_view_box, div.thum-txtin")
+                        if body_el: body = clean_text(body_el.get_text("\n"))[:BODY_MAX_CHARS]
+                    except: pass
 
-def run_crawl(cutoff_dt: datetime) -> pd.DataFrame:
-    session = build_session()
-    all_results = []
+                results.append({
+                    "월": str(p_date.month), "일": str(p_date.day), "커뮤니티": "디시인사이드",
+                    "타사명/키워드": keyword, "제목": clean_text(title_tag.text), "본문(내용)": body, "URL": link
+                })
+        except Exception as e:
+            logger.error(f"디시 에러: {e}"); break
+    return results
 
-    print("\n" + "=" * 70)
-    print(f"🚀 크롤링 시작 | cutoff(포함): {cutoff_dt.strftime('%Y-%m-%d')}")
-    print(f"🔍 키워드: {', '.join(SEARCH_KEYWORDS)}")
-    print("=" * 70)
+# 3-2) 오르비
+def fetch_orbi(session, keyword, cutoff_dt):
+    results = []
+    print(f"   [오르비] 키워드: {keyword}")
+    url = f"https://orbi.kr/search?q={quote(keyword)}&type=post"
+    try:
+        time.sleep(random.uniform(*POST_DELAY))
+        resp = session.get(url, timeout=12)
+        if resp.status_code != 200: return results
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # 오르비 검색 결과 셀렉터 보강
+        posts = soup.select("div.search-result > div.p-m, div.item") 
+        for post in posts:
+            title_tag = post.select_one("a.title, a.tit")
+            date_tag = post.select_one("span.date, span.time")
+            if not title_tag or not date_tag: continue
+            
+            p_date = parse_date(date_tag.text)
+            if p_date < cutoff_dt: continue
+            
+            link = title_tag.get("href", "")
+            if link and not link.startswith("http"): link = "https://orbi.kr" + link
+            
+            results.append({
+                "월": str(p_date.month), "일": str(p_date.day), "커뮤니티": "오르비",
+                "타사명/키워드": keyword, "제목": clean_text(title_tag.text), "본문(내용)": "", "URL": link
+            })
+    except Exception as e:
+        logger.error(f"오르비 에러: {e}")
+    return results
 
-    for keyword in SEARCH_KEYWORDS:
-        print(f"\n▶️ [{keyword}] 수집 중...")
-        page = 1
-        keep_crawling = True
+# 3-3) 네이버 카페 (수만휘, 포만한) - 로직 고도화
+def fetch_naver_cafe(session, cafe_name, cafe_id, keyword, cutoff_dt):
+    results = []
+    print(f"   [{cafe_name}] 키워드: {keyword}")
+    
+    # 500 에러 방지를 위해 헤더 강화 및 URL 변경
+    cafe_headers = session.headers.copy()
+    cafe_headers.update({
+        "Referer": f"https://m.cafe.naver.com/ca-fe/web/cafes/{cafe_id}/search/articles?query={quote(keyword)}",
+        "X-Cafe-Product": "m"
+    })
 
-        while keep_crawling and page <= MAX_PAGES_PER_KEYWORD:
-            encoded = quote(keyword)
-            url = f"https://search.dcinside.com/post/p/{page}/sort/date/q/{encoded}"
-
-            try:
-                time.sleep(random.uniform(*POST_DELAY))
-                search_headers = session.headers.copy()
-                search_headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36"
-
-                resp = session.get(url, headers=search_headers, timeout=10)
-                if resp.status_code != 200:
-                    break
-
-                soup = BeautifulSoup(resp.text, "html.parser")
-                posts = soup.select(".sch_result_list > li")
-                if not posts:
-                    break
-
-                valid_count = 0
-                for post in posts:
-                    date_tag = post.select_one("span.date_time")
-                    title_tag = post.select_one("a.tit_txt")
-                    if not date_tag or not title_tag:
-                        continue
-
-                    post_date = parse_date(date_tag.text)
-
-                    # cutoff 이전(더 과거)면 정지
-                    if post_date < cutoff_dt:
-                        print(f"   🛑 {post_date.strftime('%Y-%m-%d')} 발견 → cutoff 도달로 정지")
-                        keep_crawling = False
-                        break
-
-                    title = clean_text(title_tag.text)
-                    link = title_tag.get("href", "")
-
-                    if not is_valid_url(link):
-                        continue
-
-                    body = fetch_post_body(session, link) if FETCH_BODY else ""
-
-                    all_results.append({
-                        "월": str(post_date.month),
-                        "일": str(post_date.day),
-                        "커뮤니티": "디시인사이드",
-                        "타사명/키워드": keyword,
-                        "제목": title,
-                        "본문(내용)": body,
-                        "URL": link,
-                        "_sort_date": post_date
-                    })
-                    valid_count += 1
-
-                print(f"   ✅ {page}페이지: {valid_count}건")
-                page += 1
-
-            except Exception as e:
-                print(f"   ❌ 에러: {e}")
+    for page in range(1, 3): # 카페 수집 범위 제한 (안정성)
+        # 안정적인 모바일 검색 URL 사용
+        url = f"https://m.cafe.naver.com/ArticleSearchList.nhn?search.cafeId={cafe_id}&search.query={quote(keyword)}&search.page={page}"
+        try:
+            time.sleep(random.uniform(2.0, 4.0)) # 더 넉넉한 딜레이
+            resp = session.get(url, headers=cafe_headers, timeout=15)
+            
+            if resp.status_code != 200:
+                logger.warning(f"   [{cafe_name}] 상태 코드 불량: {resp.status_code}")
                 break
+                
+            soup = BeautifulSoup(resp.text, "html.parser")
+            posts = soup.select("li.board_box, ul.list_area > li")
+            if not posts: 
+                # 다른 구조 시도
+                posts = soup.select("div.article_list_area li")
+                if not posts: break
+            
+            for post in posts:
+                title_el = post.select_one("strong.tit, span.tit, div.tit")
+                date_el = post.select_one("span.time, span.date")
+                if not title_el or not date_el: continue
+                
+                p_date = parse_date(date_el.text)
+                if p_date < cutoff_dt: return results
+                
+                a_tag = post.select_one("a")
+                if not a_tag: continue
+                link = a_tag.get("href", "")
+                if link and not link.startswith("http"): link = "https://m.cafe.naver.com" + link
+                
+                results.append({
+                    "월": str(p_date.month), "일": str(p_date.day), "커뮤니티": cafe_name,
+                    "타사명/키워드": keyword, "제목": clean_text(title_el.text), "본문(내용)": "", "URL": link
+                })
+        except Exception as e:
+            logger.error(f"네이버 카페({cafe_name}) 에러: {e}"); break
+    return results
 
-    if not all_results:
-        return pd.DataFrame(columns=HEADERS)
 
-    df = pd.DataFrame(all_results)
-
-    # 중복 제거: URL 기준(안정)
-    df.drop_duplicates(subset=["URL"], keep="first", inplace=True)
-
-    # 정렬: 날짜 오름차순 + 키워드 지정 순서
-    df["_kw_rank"] = df["타사명/키워드"].map(SORT_RANK).fillna(SORT_RANK.get("기타", 999)).astype(int)
-    df =A
-    df = df.sort_values(by=["_sort_date", "_kw_rank"], ascending=[True, True])
-
-    df.drop(columns=["_sort_date", "_kw_rank"], inplace=True, errors="ignore")
-
-    for c in HEADERS:
-        if c not in df.columns:
-            df[c] = ""
-    df = df[HEADERS].copy().fillna("")
-
-    return df
-
+# =========================
+# 4) 메인 실행 로직
+# =========================
 def main():
-    cutoff_dt = get_user_cutoff_date()
-    df_result = run_crawl(cutoff_dt)
+    print("\n📅 수집 시작 날짜 입력 (YYYY-MM-DD)")
+    date_input = input("👉 입력: ").strip()
+    try:
+        cutoff_dt = datetime.strptime(date_input, "%Y-%m-%d")
+    except:
+        print("❌ 날짜 형식이 잘못되었습니다."); return
 
-    print("\n" + "=" * 70)
-    print(f"📌 크롤링 결과: {len(df_result)}건")
-    print("=" * 70)
+    session = build_session()
+    final_data = []
 
-    if len(df_result) == 0:
-        print("⚠️ 수집된 데이터가 없습니다.")
-        return
+    for kw in SEARCH_KEYWORDS:
+        logger.info(f"🚀 [{kw}] 통합 수집 프로세스 가동...")
+        
+        # 각 사이트별 수집 기능을 독립적인 try-except로 감싸 안정성 확보
+        try:
+            final_data.extend(fetch_dc_inside(session, kw, cutoff_dt))
+        except Exception as e:
+            logger.error(f"디시 수집 실패: {e}")
 
-    gc = connect_gsheet()
-    sh = open_spreadsheet(gc, SPREADSHEET_URL)
-    ws = get_or_create_worksheet(sh, INPUT_SHEET_NAME)
-    ensure_header(ws, HEADERS)
-    append_dataframe(ws, df_result, HEADERS)
+        try:
+            final_data.extend(fetch_orbi(session, kw, cutoff_dt))
+        except Exception as e:
+            logger.error(f"오르비 수집 실패: {e}")
 
-    print("\n✅ 완료: 크롤링 → 구글시트 저장")
-    print("시트 이름:", sh.title)
-    print("탭 이름:", ws.title)
+        for name, cid in NAVER_CAFES.items():
+            try:
+                final_data.extend(fetch_naver_cafe(session, name, cid, kw, cutoff_dt))
+            except Exception as e:
+                logger.error(f"{name} 수집 실패: {e}")
 
-main()
+    if not final_data:
+        print("\n⚠️ 수집된 데이터가 최종적으로 존재하지 않습니다."); return
+
+    df = pd.DataFrame(final_data).drop_duplicates(subset=["URL"])
+    print(f"\n✅ 필터링 후 총 {len(df)}건 수집 완료 (중복 제외)")
+
+    # 구글 시트 저장
+    try:
+        print("\n📊 구글 시트 연결 시도 중...")
+        gc = connect_gsheet()
+        spreadsheet_id = extract_spreadsheet_id(SPREADSHEET_URL)
+        sh = gc.open_by_key(spreadsheet_id)
+        
+        # 전체 워크시트 목록 출력 (디버깅용)
+        all_ws_names = [w.title for w in sh.worksheets()]
+        logger.info(f"📑 현재 스프레드시트 내 시트 목록: {all_ws_names}")
+        
+        if INPUT_SHEET_NAME not in all_ws_names:
+            logger.error(f"❌ '{INPUT_SHEET_NAME}' 시트를 찾을 수 없습니다. 목록을 확인해 주세요.")
+            return
+
+        ws = sh.worksheet(INPUT_SHEET_NAME)
+        ensure_header(ws, HEADERS)
+        
+        # 데이터 업로드
+        df_upload = df[HEADERS].fillna("").astype(str)
+        if not df_upload.empty:
+            print(f"⬆️ '{ws.title}' 시트에 {len(df_upload)}건의 데이터를 업로드합니다...")
+            last_row = len(ws.get_all_values()) + 1
+            ws.update(df_upload.values.tolist(), f"A{last_row}")
+            logger.info(f"🚀 구글 시트 업로드 성공! ({ws.title}) 총 {last_row + len(df_upload) - 1}행이 되었습니다.")
+        else:
+            logger.info("⚠️ 업로드할 수집 데이터가 없습니다. 검색 결과가 비어있을 수 있습니다.")
+    except Exception as e:
+        logger.error(f"❌ 구글 시트 저장 중 예외 발생: {e}")
+        print(f"   (도움말: Colab에서 구글 계정 인증 팝업이 떴는지, 시트 편집 권한이 있는지 확인해 주세요.)")
+
+if __name__ == "__main__":
+    main()
