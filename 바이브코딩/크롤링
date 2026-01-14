@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # =========================
 # 1) 설정 (URL 및 키워드)
 # =========================
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1RM3VNmM8_mW_MDCzp8lsko38KFVE5-5Hq5ImpLeYeQU/edit?gid=0#gid=0"
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1RM3VNmM8_mW_MDCzp8lsko38KFVE5-5Hq5ImpLeYeQU/edit?gid=388396824#gid=388396824"
 INPUT_SHEET_NAME = "📂 원본_데이터_입력"
 HEADERS = ["월", "일", "커뮤니티", "타사명/키워드", "제목", "본문(내용)", "URL"]
 
@@ -73,6 +73,11 @@ def extract_spreadsheet_id(url: str) -> str:
     m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", url)
     if not m: raise ValueError("스프레드시트 ID를 찾지 못했습니다.")
     return m.group(1)
+
+def extract_gid(url: str) -> str:
+    """URL에서 gid 파라미터를 추출합니다."""
+    m = re.search(r"gid=(\d+)", url)
+    return m.group(1) if m else None
 
 def ensure_header(ws, headers):
     try:
@@ -310,17 +315,21 @@ def main():
         print("\n📊 구글 시트 연결 시도 중...")
         gc = connect_gsheet()
         spreadsheet_id = extract_spreadsheet_id(SPREADSHEET_URL)
+        target_gid = extract_gid(SPREADSHEET_URL)
         sh = gc.open_by_key(spreadsheet_id)
         
-        # 전체 워크시트 목록 출력 (디버깅용)
-        all_ws_names = [w.title for w in sh.worksheets()]
-        logger.info(f"📑 현재 스프레드시트 내 시트 목록: {all_ws_names}")
+        # GID가 있으면 ID로, 없으면 이름으로 시트 선택
+        ws = None
+        if target_gid:
+            try:
+                ws = sh.get_worksheet_by_id(int(target_gid))
+                logger.info(f"� GID({target_gid})를 사용하여 시트를 선택했습니다: '{ws.title}'")
+            except:
+                logger.warning(f"⚠️ GID({target_gid})로 시트를 찾지 못했습니다. 이름('{INPUT_SHEET_NAME}')으로 재시도합니다.")
         
-        if INPUT_SHEET_NAME not in all_ws_names:
-            logger.error(f"❌ '{INPUT_SHEET_NAME}' 시트를 찾을 수 없습니다. 목록을 확인해 주세요.")
-            return
+        if not ws:
+            ws = sh.worksheet(INPUT_SHEET_NAME)
 
-        ws = sh.worksheet(INPUT_SHEET_NAME)
         ensure_header(ws, HEADERS)
         
         # 데이터 업로드
