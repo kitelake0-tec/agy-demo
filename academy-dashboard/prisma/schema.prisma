@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // 지점명
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  monthlyKpis MonthlyKpi[]
+}
+
+model MonthlyKpi {
+  id        Int      @id @default(autoincrement())
+  branchId  Int
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  
+  yearMonth DateTime // 년월 (Stored as first day of month usually, e.g., 2024-01-01)
+  
+  totalRevenue     BigInt // 총매출
+  tuitionRevenue   BigInt // 수강료매출
+  consultingRevenue BigInt // 컨설팅매출
+  otherRevenue     BigInt // 기타매출
+  operatingCost    BigInt // 운영비
+  netProfit        BigInt // 순이익
+  
+  activeStudents   Int // 재원생수
+  newStudents      Int // 신규생수
+  dropoutStudents  Int // 퇴원생수
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, yearMonth]) // A branch should have only one record per month
+}
