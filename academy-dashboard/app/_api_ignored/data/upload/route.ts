@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         let successCount = 0;
         let failCount = 0;
 
-        for (const row of records) {
+        for (const row of records as any[]) {
             try {
                 // row keys: 지점명, 년월, ... maps to DB
                 const branchName = row['지점명'];

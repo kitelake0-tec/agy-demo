@@ -23,6 +23,7 @@ interface DashboardStats {
 }
 
 import BranchSearch from "@/components/dashboard/BranchSearch";
+import { MOCK_DASHBOARD_STATS } from "@/lib/mockData";
 
 export default function DashboardPage() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -41,9 +42,14 @@ export default function DashboardPage() {
                 if (res.ok) {
                     const data = await res.json();
                     setStats(data);
+                } else {
+                    // Fallback for static demo
+                    console.log("Using Mock Data");
+                    setStats(MOCK_DASHBOARD_STATS as any);
                 }
             } catch (e) {
-                console.error("Dashboard fetch error", e);
+                console.error("Dashboard fetch error - Using Mock Data", e);
+                setStats(MOCK_DASHBOARD_STATS as any);
             } finally {
                 setLoading(false);
             }
