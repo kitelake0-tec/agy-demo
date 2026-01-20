@@ -1,0 +1,59 @@
+.dashboard-home {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-lg);
+}
+
+.dashboard-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.split-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xl);
+}
+
+@media (max-width: 1024px) {
+    .split-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-badge.normal {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.status-badge.warning,
+.status-badge.danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.warning-section .status-badge.warning,
+.warning-section .status-badge.danger {
+    color: #ef4444;
+    /* More visible in warning table */
+}

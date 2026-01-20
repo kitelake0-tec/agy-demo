@@ -1,0 +1,36 @@
+.branch-list-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filters {
+    display: flex;
+    gap: var(--space-md);
+}
+
+.search-input {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-md);
+    width: 240px;
+}
+
+.status-select {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--radius-md);
+    background-color: white;
+}
+
+.table-wrapper {
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
