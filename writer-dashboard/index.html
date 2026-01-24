@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writer's Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>Writer's Dashboard</h1>
+                <p>목표를 향한 당신의 여정을 기록하세요</p>
+            </div>
+            <button id="settingsBtn" class="icon-btn" aria-label="설정">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+        </header>
+
+        <main>
+            <!-- Summary Cards -->
+            <section class="metrics-grid">
+                <div class="card metric-card">
+                    <h3>현재 달성률</h3>
+                    <div class="metric-value" id="progressPercent">0%</div>
+                    <div class="metric-sub" id="progressCount">0 / 0 편</div>
+                </div>
+                <div class="card metric-card">
+                    <h3>남은 기간</h3>
+                    <div class="metric-value" id="daysLeft">0일</div>
+                    <div class="metric-sub" id="deadlineDate">-</div>
+                </div>
+                <div class="card metric-card">
+                    <h3>성공 확률</h3>
+                    <div class="metric-value" id="successRate">0%</div>
+                    <div class="metric-sub" id="riskLevel">-</div>
+                </div>
+                <div class="card metric-card">
+                    <h3>예상 완주일</h3>
+                    <div class="metric-value" id="estimatedDate">-</div>
+                    <div class="metric-sub" id="earlyDays">-</div>
+                </div>
+            </section>
+
+            <!-- Input Section -->
+            <section class="card input-section">
+                <h2>오늘의 기록</h2>
+                <form id="logForm">
+                    <div class="input-group">
+                        <label for="logDate">날짜</label>
+                        <input type="date" id="logDate" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="logCount">작성한 편수</label>
+                        <input type="number" id="logCount" min="0" step="0.1" required placeholder="예: 1.5">
+                    </div>
+                    <button type="submit" class="btn-primary">기록하기</button>
+                </form>
+            </section>
+
+            <!-- Chart Section -->
+            <section class="card chart-section">
+                <h2>진행 추이</h2>
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content card">
+            <span class="close-btn">&times;</span>
+            <h2>목표 설정</h2>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label for="totalGoal">총 목표 편수</label>
+                    <input type="number" id="totalGoal" required min="1">
+                </div>
+                <div class="form-group">
+                    <label for="startDate">시작일</label>
+                    <input type="date" id="startDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="deadline">목표 마감일</label>
+                    <input type="date" id="deadline" required>
+                </div>
+                <div class="form-group">
+                    <label for="maxPerDay">일일 최대 작성 가능 편수 (분석용)</label>
+                    <input type="number" id="maxPerDay" required min="1" step="0.1">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
