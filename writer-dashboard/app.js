@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // ==========================================
@@ -34,6 +34,7 @@ let currentUser = null;
 let projects = [];
 let currentProject = null;
 let chart = null;
+let isSignUpMode = false;
 
 // ==========================================
 //  DOM ELEMENTS
@@ -45,10 +46,20 @@ const views = {
 };
 
 const els = {
-    // Auth
+    // Auth - Shared
     googleLoginBtn: document.getElementById('googleLoginBtn'),
     logoutBtn: document.getElementById('logoutBtn'),
     userEmail: document.getElementById('userEmail'),
+
+    // Auth - Email
+    emailAuthForm: document.getElementById('emailAuthForm'),
+    emailInput: document.getElementById('emailInput'),
+    passwordInput: document.getElementById('passwordInput'),
+    authSubmitBtn: document.getElementById('authSubmitBtn'),
+    authSwitchBtn: document.getElementById('authSwitchBtn'),
+    authTitle: document.getElementById('authTitle'),
+    authDesc: document.getElementById('authDesc'),
+    authSwitchText: document.getElementById('authSwitchText'),
 
     // Hub
     projectList: document.getElementById('projectList'),
@@ -118,6 +129,8 @@ function setupEventListeners() {
     // Auth
     els.googleLoginBtn.addEventListener('click', handleGoogleLogin);
     els.logoutBtn.addEventListener('click', handleLogout);
+    els.emailAuthForm.addEventListener('submit', handleEmailAuth);
+    els.authSwitchBtn.addEventListener('click', toggleAuthMode);
 
     // Hub
     els.addProjectBtn.addEventListener('click', () => openModal('add'));
@@ -143,8 +156,60 @@ function setupEventListeners() {
     });
 }
 
+function toggleAuthMode(e) {
+    e.preventDefault();
+    isSignUpMode = !isSignUpMode;
+
+    if (isSignUpMode) {
+        els.authTitle.textContent = "회원가입";
+        els.authDesc.textContent = "Writer's Dashboard에 오신 것을 환영합니다.";
+        els.authSubmitBtn.textContent = "가입하기";
+        els.authSwitchText.textContent = "이미 계정이 있으신가요?";
+        els.authSwitchBtn.textContent = "로그인";
+    } else {
+        els.authTitle.textContent = "로그인";
+        els.authDesc.textContent = "프로젝트를 관리하려면 로그인이 필요합니다.";
+        els.authSubmitBtn.textContent = "로그인";
+        els.authSwitchText.textContent = "계정이 없으신가요?";
+        els.authSwitchBtn.textContent = "회원가입";
+    }
+
+    els.emailAuthForm.reset();
+}
+
+async function handleEmailAuth(e) {
+    e.preventDefault();
+    const email = els.emailInput.value;
+    const password = els.passwordInput.value;
+
+    try {
+        if (isSignUpMode) {
+            // Sign Up
+            await createUserWithEmailAndPassword(auth, email, password);
+            // Auth state listener will handle redirection
+        } else {
+            // Sign In
+            await signInWithEmailAndPassword(auth, email, password);
+        }
+    } catch (error) {
+        console.error("Auth Error:", error);
+        let msg = "오류가 발생했습니다.";
+
+        switch (error.code) {
+            case 'auth/invalid-email': msg = "유효하지 않은 이메일 형식입니다."; break;
+            case 'auth/user-disabled': msg = "비활성화된 사용자입니다."; break;
+            case 'auth/user-not-found': msg = "사용자를 찾을 수 없습니다."; break;
+            case 'auth/wrong-password': msg = "비밀번호가 틀렸습니다."; break;
+            case 'auth/email-already-in-use': msg = "이미 사용 중인 이메일입니다."; break;
+            case 'auth/weak-password': msg = "비밀번호는 6자리 이상이어야 합니다."; break;
+        }
+
+        alert(msg);
+    }
+}
+
 async function handleGoogleLogin() {
-    constprovider = new GoogleAuthProvider();
+    const provider = new GoogleAuthProvider();
     try {
         await signInWithPopup(auth, provider);
     } catch (error) {

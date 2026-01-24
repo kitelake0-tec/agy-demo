@@ -248,6 +248,53 @@ input:focus {
     margin-bottom: 24px;
 }
 
+#emailAuthForm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.auth-switch {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.auth-switch .btn-text {
+    font-size: 0.9rem;
+    padding: 0 4px;
+    color: var(--accent-color);
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.auth-switch .btn-text:hover {
+    text-decoration: underline;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.divider span {
+    padding: 0 12px;
+}
+
 .btn-full {
     width: 100%;
     margin-bottom: 12px;

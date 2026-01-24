@@ -27,8 +27,28 @@
             </header>
             <main>
                 <section class="card login-card">
-                    <h2>로그인</h2>
-                    <p class="login-desc">프로젝트를 관리하려면 로그인이 필요합니다.</p>
+                    <h2 id="authTitle">로그인</h2>
+                    <p class="login-desc" id="authDesc">프로젝트를 관리하려면 로그인이 필요합니다.</p>
+
+                    <form id="emailAuthForm">
+                        <div class="input-group">
+                            <input type="email" id="emailInput" placeholder="이메일" required>
+                        </div>
+                        <div class="input-group">
+                            <input type="password" id="passwordInput" placeholder="비밀번호 (6자 이상)" required minlength="6">
+                        </div>
+                        <button type="submit" class="btn-primary btn-full" id="authSubmitBtn">로그인</button>
+                    </form>
+
+                    <p class="auth-switch">
+                        <span id="authSwitchText">계정이 없으신가요?</span>
+                        <button id="authSwitchBtn" class="btn-text">회원가입</button>
+                    </p>
+
+                    <div class="divider">
+                        <span>또는</span>
+                    </div>
+
                     <button id="googleLoginBtn" class="btn-primary btn-full btn-google">
                         <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px"
                             height="20px">
