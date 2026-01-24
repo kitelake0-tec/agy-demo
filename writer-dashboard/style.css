@@ -110,7 +110,8 @@ h1 {
     margin-bottom: 32px;
 }
 
-.input-section h2, .chart-section h2 {
+.input-section h2,
+.chart-section h2 {
     font-family: var(--font-heading);
     font-size: 1.25rem;
     margin-bottom: 20px;
@@ -123,7 +124,8 @@ form {
     align-items: end;
 }
 
-.input-group, .form-group {
+.input-group,
+.form-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -212,13 +214,220 @@ input:focus {
     flex-direction: column;
 }
 
+/* View Management */
+.view-section {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Login View */
+.login-card {
+    max-width: 400px;
+    margin: 80px auto;
+    text-align: center;
+    padding: 40px;
+}
+
+.login-desc {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.btn-full {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.btn-google {
+    background: white;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-weight: 500;
+}
+
+.btn-google:hover {
+    background: #f1f1f1;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-text.danger {
+    color: var(--danger-color);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    opacity: 0.8;
+}
+
+.btn-text.danger:hover {
+    opacity: 1;
+}
+
+/* Hub View */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.user-badge {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.summary-metrics {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+}
+
+.metric-mini {
+    text-align: center;
+}
+
+.metric-mini .label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.metric-mini .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: var(--font-heading);
+}
+
+.value.accent-danger {
+    color: var(--danger-color);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.btn-primary.small {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.project-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 180px;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-color);
+}
+
+.project-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.project-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.project-bar-container {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: auto;
+}
+
+.project-bar {
+    height: 100%;
+    background: var(--accent-gradient);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.project-status {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.status-shout {
+    color: var(--warning-color);
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .header-content h1 {
         font-size: 1.5rem;
     }
-    
+
     .metric-value {
         font-size: 2rem;
+    }
+
+    .summary-metrics {
+        flex-direction: column;
+        gap: 16px;
     }
 }

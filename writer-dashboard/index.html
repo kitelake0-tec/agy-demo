@@ -1,84 +1,190 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Writer's Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@400;600;800&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="app-container">
-        <header>
-            <div class="header-content">
-                <h1>Writer's Dashboard</h1>
-                <p>목표를 향한 당신의 여정을 기록하세요</p>
-            </div>
-            <button id="settingsBtn" class="icon-btn" aria-label="설정">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
-        </header>
 
-        <main>
-            <!-- Summary Cards -->
-            <section class="metrics-grid">
-                <div class="card metric-card">
-                    <h3>현재 달성률</h3>
-                    <div class="metric-value" id="progressPercent">0%</div>
-                    <div class="metric-sub" id="progressCount">0 / 0 편</div>
+        <!-- LOGIN VIEW -->
+        <div id="login-view" class="view-section">
+            <header>
+                <div class="header-content">
+                    <h1>Writer's Dashboard</h1>
+                    <p>목표를 향한 당신의 여정을 시작하세요</p>
                 </div>
-                <div class="card metric-card">
-                    <h3>남은 기간</h3>
-                    <div class="metric-value" id="daysLeft">0일</div>
-                    <div class="metric-sub" id="deadlineDate">-</div>
-                </div>
-                <div class="card metric-card">
-                    <h3>성공 확률</h3>
-                    <div class="metric-value" id="successRate">0%</div>
-                    <div class="metric-sub" id="riskLevel">-</div>
-                </div>
-                <div class="card metric-card">
-                    <h3>예상 완주일</h3>
-                    <div class="metric-value" id="estimatedDate">-</div>
-                    <div class="metric-sub" id="earlyDays">-</div>
-                </div>
-            </section>
+            </header>
+            <main>
+                <section class="card login-card">
+                    <h2>로그인</h2>
+                    <p class="login-desc">프로젝트를 관리하려면 로그인이 필요합니다.</p>
+                    <button id="googleLoginBtn" class="btn-primary btn-full btn-google">
+                        <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px"
+                            height="20px">
+                            <path fill="#FFC107"
+                                d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                            <path fill="#FF3D00"
+                                d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                            <path fill="#4CAF50"
+                                d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                            <path fill="#1976D2"
+                                d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                        </svg>
+                        Google 계정으로 로그인 (데모)
+                    </button>
+                    <!-- <button id="guestLoginBtn" class="btn-text">게스트로 둘러보기</button> -->
+                </section>
+            </main>
+        </div>
 
-            <!-- Input Section -->
-            <section class="card input-section">
-                <h2>오늘의 기록</h2>
-                <form id="logForm">
-                    <div class="input-group">
-                        <label for="logDate">날짜</label>
-                        <input type="date" id="logDate" required>
+        <!-- HUB VIEW -->
+        <div id="hub-view" class="view-section hidden">
+            <header>
+                <div class="header-content">
+                    <h1>내 프로젝트</h1>
+                    <p>현재 진행 중인 목표 한눈에 보기</p>
+                </div>
+                <div class="header-actions">
+                    <span id="userEmail" class="user-badge"></span>
+                    <button id="logoutBtn" class="btn-secondary">로그아웃</button>
+                </div>
+            </header>
+
+            <main>
+                <!-- Summary Panel -->
+                <section class="card summary-panel">
+                    <h2>전체 프로젝트 요약</h2>
+                    <div class="summary-metrics">
+                        <div class="metric-mini">
+                            <span class="label">진행 중</span>
+                            <span class="value" id="totalProjectsCount">-</span>
+                        </div>
+                        <div class="metric-mini">
+                            <span class="label">평균 달성률</span>
+                            <span class="value" id="avgProgress">-</span>
+                        </div>
+                        <div class="metric-mini">
+                            <span class="label">주의/위험</span>
+                            <span class="value accent-danger" id="riskCount">-</span>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label for="logCount">작성한 편수</label>
-                        <input type="number" id="logCount" min="0" step="0.1" required placeholder="예: 1.5">
-                    </div>
-                    <button type="submit" class="btn-primary">기록하기</button>
-                </form>
-            </section>
+                </section>
 
-            <!-- Chart Section -->
-            <section class="card chart-section">
-                <h2>진행 추이</h2>
-                <div class="chart-container">
-                    <canvas id="progressChart"></canvas>
+                <!-- Project List -->
+                <section class="input-section">
+                    <div class="section-header">
+                        <h2>진행 중인 프로젝트 목록</h2>
+                        <button id="addProjectBtn" class="btn-primary small">+ 프로젝트 추가</button>
+                    </div>
+                    <div id="projectList" class="cards-grid">
+                        <!-- Projects will be injected here -->
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- DETAIL VIEW (Existing) -->
+        <div id="detail-view" class="view-section hidden">
+            <header>
+                <button id="backToHubBtn" class="icon-btn" aria-label="뒤로가기">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                </button>
+                <div class="header-content">
+                    <h1 id="projectTitleDisplay">프로젝트 상세</h1>
+                    <p id="projectDateRangeDisplay">-</p>
                 </div>
-            </section>
-        </main>
+                <button id="settingsBtn" class="icon-btn" aria-label="설정">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+                        </path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+            </header>
+
+            <main>
+                <!-- Summary Cards -->
+                <section class="metrics-grid">
+                    <div class="card metric-card">
+                        <h3>현재 달성률</h3>
+                        <div class="metric-value" id="progressPercent">0%</div>
+                        <div class="metric-sub" id="progressCount">0 / 0 편</div>
+                    </div>
+                    <div class="card metric-card">
+                        <h3>남은 기간</h3>
+                        <div class="metric-value" id="daysLeft">0일</div>
+                        <div class="metric-sub" id="deadlineDate">-</div>
+                    </div>
+                    <div class="card metric-card">
+                        <h3>성공 확률</h3>
+                        <div class="metric-value" id="successRate">0%</div>
+                        <div class="metric-sub" id="riskLevel">-</div>
+                    </div>
+                    <div class="card metric-card">
+                        <h3>예상 완주일</h3>
+                        <div class="metric-value" id="estimatedDate">-</div>
+                        <div class="metric-sub" id="earlyDays">-</div>
+                    </div>
+                </section>
+
+                <!-- Input Section -->
+                <section class="card input-section">
+                    <h2>오늘의 기록</h2>
+                    <form id="logForm">
+                        <div class="input-group">
+                            <label for="logDate">날짜</label>
+                            <input type="date" id="logDate" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="logCount">작성한 편수</label>
+                            <input type="number" id="logCount" min="0" step="0.1" required placeholder="예: 1.5">
+                        </div>
+                        <button type="submit" class="btn-primary">기록하기</button>
+                    </form>
+                </section>
+
+                <!-- Chart Section -->
+                <section class="card chart-section">
+                    <h2>진행 추이</h2>
+                    <div class="chart-container">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </section>
+
+                <div style="margin-top:20px; text-align:right;">
+                    <button id="deleteProjectBtn" class="btn-text danger">이 프로젝트 삭제</button>
+                </div>
+            </main>
+        </div>
     </div>
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
         <div class="modal-content card">
             <span class="close-btn">&times;</span>
-            <h2>목표 설정</h2>
+            <h2 id="modalTitle">목표 설정</h2>
             <form id="settingsForm">
+                <div class="form-group">
+                    <label for="projectTitle">프로젝트 명</label>
+                    <input type="text" id="projectTitle" required placeholder="예: 웹소설 200화 완결">
+                </div>
                 <div class="form-group">
                     <label for="totalGoal">총 목표 편수</label>
                     <input type="number" id="totalGoal" required min="1">
@@ -102,6 +208,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
+
 </html>
