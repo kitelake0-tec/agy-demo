@@ -45,6 +45,9 @@ jobs:
       - name: Copy Writer Dashboard
         run: cp -r writer-dashboard academy-dashboard/out/
 
+      - name: Copy RPG Game
+        run: cp -r rpg-game academy-dashboard/out/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
