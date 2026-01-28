@@ -13,7 +13,7 @@ const handler = NextAuth({
                 // Add logic here to look up the user from the credentials supplied
                 const user = { id: "1", name: "Admin", email: "admin@example.com" }
 
-                if (credentials?.username === "admin" && credentials?.password === "admin") {
+                if (credentials?.username === process.env.ADMIN_USER && credentials?.password === process.env.ADMIN_PASSWORD) {
                     return user
                 } else {
                     return null

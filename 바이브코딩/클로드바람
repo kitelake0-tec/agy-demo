@@ -1,0 +1,4304 @@
+📦 전체 게임 코드
+아래의 모든 코드를 복사하여 사용하실 수 있습니다.
+
+📁 index.html
+HTML
+
+    < !DOCTYPE html >
+        <html lang="ko" >
+            <head>
+            <meta charset="UTF-8" />
+                <link rel="icon" type = "image/svg+xml" href = "/vite.svg" />
+                    <meta name="viewport" content = "width=device-width, initial-scale=1.0" />
+                        <title>바람의 나라 - 클래식 RPG </title>
+                            <style>
+                            * {
+                            margin: 0;
+                            padding: 0;
+                            box- sizing: border - box;
+      }
+      body {
+    overflow: hidden;
+    background - color: #000;
+}
+</style>
+    </head>
+    < body >
+    <div id="root" > </div>
+        < script type = "module" src = "/src/main.tsx" > </script>
+            </body>
+            </html>
+📁 src / main.tsx
+React
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+    <App />
+    </StrictMode>,
+)
+📁 src / App.tsx
+React
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import Phaser from 'phaser';
+import { gameConfig } from './game/GameConfig';
+import { GameEventBus } from './game/GameEventBus';
+import HUD from './components/UI/HUD';
+import Inventory from './components/UI/Inventory';
+import DungeonSelector from './components/UI/DungeonSelector';
+import SkillBar from './components/UI/SkillBar';
+import QuestPanel from './components/UI/QuestPanel';
+import CodeViewer from './components/UI/CodeViewer';
+
+// 타입 정의
+interface PlayerStats {
+    hp: number;
+    maxHp: number;
+    mp: number;
+    maxMp: number;
+    level: number;
+    exp: number;
+    expToNext: number;
+    gold: number;
+    attack: number;
+    defense: number;
+}
+
+interface InventoryItem {
+    id: string;
+    name: string;
+    type: 'weapon' | 'armor' | 'consumable' | 'material' | 'skillbook';
+    icon: string;
+    quantity: number;
+    description: string;
+    price: number;
+    sellPrice?: number;
+    effect?: {
+        hp?: number;
+        mp?: number;
+        attack?: number;
+        defense?: number;
+    };
+    requiredLevel?: number;
+}
+
+interface Skill {
+    id: string;
+    name: string;
+    icon: string;
+    damage: number;
+    mpCost: number;
+    cooldown: number;
+    currentCooldown: number;
+    requiredLevel: number;
+    description: string;
+}
+
+interface QuickSlot {
+    slot: number;
+    item: InventoryItem | null;
+}
+
+interface ActiveBuff {
+    id: string;
+    name: string;
+    icon: string;
+    duration: number;
+    remainingTime: number;
+    effect: {
+        attack?: number;
+        defense?: number;
+        speed?: number;
+    };
+}
+
+interface Quest {
+    id: string;
+    title: string;
+    description: string;
+    type: 'daily' | 'main' | 'side';
+    objectives: {
+        type: string;
+        target: string;
+        current: number;
+        required: number;
+    }[];
+    rewards: {
+        exp?: number;
+        gold?: number;
+        items?: { id: string; quantity: number }[];
+    };
+    completed: boolean;
+    claimed: boolean;
+}
+
+interface CombatStats {
+    totalDamage: number;
+    killCount: number;
+    critCount: number;
+    hitCount: number;
+    startTime: number;
+    dps: number;
+}
+
+interface MinimapData {
+    playerX: number;
+    playerY: number;
+    worldWidth: number;
+    worldHeight: number;
+    monsters: { x: number; y: number; isBoss: boolean }[];
+}
+
+interface Pet {
+    id: string;
+    name: string;
+    icon: string;
+    rarity: 'common' | 'rare' | 'epic' | 'legendary';
+    bonus: {
+        goldBonus?: number;
+        expBonus?: number;
+        attackBonus?: number;
+        hpRegen?: number;
+        mpRegen?: number;
+    };
+    price: number;
+    requiredLevel: number;
+    owned: boolean;
+    active: boolean;
+}
+
+interface Achievement {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    category: 'combat' | 'growth' | 'wealth' | 'exploration';
+    requirement: number;
+    current: number;
+    completed: boolean;
+    claimed: boolean;
+    reward: {
+        gold?: number;
+        exp?: number;
+        title?: string;
+    };
+}
+
+interface Title {
+    id: string;
+    name: string;
+    description: string;
+    color: string;
+    bonus: {
+        attack?: number;
+        defense?: number;
+        critRate?: number;
+        expBonus?: number;
+    };
+    equipped: boolean;
+    unlocked: boolean;
+}
+
+interface GameStats {
+    totalKills: number;
+    totalDamageDealt: number;
+    totalGoldEarned: number;
+    totalExpEarned: number;
+    highestCombo: number;
+    totalDeaths: number;
+    playTime: number;
+    dungeonsCleared: number;
+    bossesKilled: number;
+}
+
+interface GameSettings {
+    bgmVolume: number;
+    sfxVolume: number;
+    showDamageNumbers: boolean;
+    showMinimap: boolean;
+    autoLoot: boolean;
+    screenShake: boolean;
+}
+
+function App() {
+    const gameRef = useRef<Phaser.Game | null>(null);
+    const [currentScene, setCurrentScene] = useState<string>('boot');
+    const [playerStats, setPlayerStats] = useState<PlayerStats>({
+        hp: 100,
+        maxHp: 100,
+        mp: 50,
+        maxMp: 50,
+        level: 1,
+        exp: 0,
+        expToNext: 100,
+        gold: 1000,
+        attack: 10,
+        defense: 5,
+    });
+    const [inventory, setInventory] = useState<InventoryItem[]>([
+        {
+            id: 'hp_potion_1',
+            name: '동동주',
+            type: 'consumable',
+            icon: '🍶',
+            quantity: 10,
+            description: 'HP를 50 회복합니다.',
+            price: 50,
+            sellPrice: 25,
+            effect: { hp: 50 },
+        },
+        {
+            id: 'mp_potion_1',
+            name: '마력 물약',
+            type: 'consumable',
+            icon: '💧',
+            quantity: 5,
+            description: 'MP를 30 회복합니다.',
+            price: 80,
+            sellPrice: 40,
+            effect: { mp: 30 },
+        },
+    ]);
+    const [skills, setSkills] = useState<Skill[]>([
+        {
+            id: 'slash',
+            name: '참격',
+            icon: '⚔️',
+            damage: 25,
+            mpCost: 5,
+            cooldown: 1000,
+            currentCooldown: 0,
+            requiredLevel: 1,
+            description: '기본 검술 공격',
+        },
+        {
+            id: 'fireball',
+            name: '화염구',
+            icon: '🔥',
+            damage: 50,
+            mpCost: 15,
+            cooldown: 3000,
+            currentCooldown: 0,
+            requiredLevel: 5,
+            description: '강력한 화염 마법',
+        },
+        {
+            id: 'heal',
+            name: '치유',
+            icon: '💚',
+            damage: 0,
+            mpCost: 20,
+            cooldown: 5000,
+            currentCooldown: 0,
+            requiredLevel: 3,
+            description: 'HP를 30 회복',
+        },
+        {
+            id: 'thunder',
+            name: '낙뢰',
+            icon: '⚡',
+            damage: 80,
+            mpCost: 25,
+            cooldown: 4000,
+            currentCooldown: 0,
+            requiredLevel: 10,
+            description: '번개를 소환하여 공격',
+        },
+        {
+            id: 'ice_storm',
+            name: '빙풍',
+            icon: '❄️',
+            damage: 60,
+            mpCost: 20,
+            cooldown: 3500,
+            currentCooldown: 0,
+            requiredLevel: 8,
+            description: '얼음 폭풍으로 범위 공격',
+        },
+        {
+            id: 'battle_cry',
+            name: '전투함성',
+            icon: '📯',
+            damage: 0,
+            mpCost: 30,
+            cooldown: 10000,
+            currentCooldown: 0,
+            requiredLevel: 15,
+            description: '10초간 공격력 50% 증가',
+        },
+    ]);
+    const [quickSlots, setQuickSlots] = useState<QuickSlot[]>([
+        { slot: 0, item: null },
+        { slot: 1, item: null },
+        { slot: 2, item: null },
+        { slot: 3, item: null },
+        { slot: 4, item: null },
+    ]);
+    const [showInventory, setShowInventory] = useState(false);
+    const [showDungeonSelector, setShowDungeonSelector] = useState(false);
+    const [showSkillBar, setShowSkillBar] = useState(false);
+    const [showQuestPanel, setShowQuestPanel] = useState(false);
+    const [showCodeViewer, setShowCodeViewer] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [showAchievements, setShowAchievements] = useState(false);
+    const [showPetShop, setShowPetShop] = useState(false);
+    const [showStats, setShowStats] = useState(false);
+    const [showDailyReward, setShowDailyReward] = useState(false);
+    const [activeBuffs, setActiveBuffs] = useState<ActiveBuff[]>([]);
+    const [isAutoAttack, setIsAutoAttack] = useState(false);
+    const [combatStats, setCombatStats] = useState<CombatStats>({
+        totalDamage: 0,
+        killCount: 0,
+        critCount: 0,
+        hitCount: 0,
+        startTime: Date.now(),
+        dps: 0,
+    });
+    const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
+    const [quests, setQuests] = useState<Quest[]>([
+        {
+            id: 'daily_kill_50',
+            title: '몬스터 사냥꾼',
+            description: '몬스터 50마리를 처치하세요',
+            type: 'daily',
+            objectives: [{ type: 'kill', target: 'any', current: 0, required: 50 }],
+            rewards: { exp: 500, gold: 200 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'daily_kill_200',
+            title: '학살자',
+            description: '몬스터 200마리를 처치하세요',
+            type: 'daily',
+            objectives: [{ type: 'kill', target: 'any', current: 0, required: 200 }],
+            rewards: { exp: 2000, gold: 1000 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'daily_gold',
+            title: '골드 수집가',
+            description: '골드를 1000 획득하세요',
+            type: 'daily',
+            objectives: [{ type: 'collect', target: 'gold', current: 0, required: 1000 }],
+            rewards: { exp: 300, gold: 500 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'main_level_10',
+            title: '성장의 시작',
+            description: '레벨 10에 도달하세요',
+            type: 'main',
+            objectives: [{ type: 'level', target: 'player', current: 1, required: 10 }],
+            rewards: { exp: 1000, gold: 500 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'main_level_50',
+            title: '숙련자의 길',
+            description: '레벨 50에 도달하세요',
+            type: 'main',
+            objectives: [{ type: 'level', target: 'player', current: 1, required: 50 }],
+            rewards: { exp: 10000, gold: 5000 },
+            completed: false,
+            claimed: false,
+        },
+    ]);
+
+    // 펫 시스템
+    const [pets, setPets] = useState<Pet[]>([
+        { id: 'slime_pet', name: '슬라임', icon: '🟢', rarity: 'common', bonus: { goldBonus: 5 }, price: 500, requiredLevel: 1, owned: false, active: false },
+        { id: 'fairy_pet', name: '요정', icon: '🧚', rarity: 'common', bonus: { expBonus: 5 }, price: 800, requiredLevel: 5, owned: false, active: false },
+        { id: 'cat_pet', name: '고양이', icon: '🐱', rarity: 'rare', bonus: { goldBonus: 10, expBonus: 5 }, price: 2000, requiredLevel: 10, owned: false, active: false },
+        { id: 'owl_pet', name: '부엉이', icon: '🦉', rarity: 'rare', bonus: { expBonus: 15 }, price: 3000, requiredLevel: 15, owned: false, active: false },
+        { id: 'phoenix_baby', name: '불사조 새끼', icon: '🐦‍🔥', rarity: 'epic', bonus: { hpRegen: 2, mpRegen: 1 }, price: 5000, requiredLevel: 20, owned: false, active: false },
+        { id: 'dragon_pet', name: '드래곤', icon: '🐲', rarity: 'epic', bonus: { attackBonus: 10, goldBonus: 10 }, price: 10000, requiredLevel: 30, owned: false, active: false },
+        { id: 'wolf_pet', name: '늑대', icon: '🐺', rarity: 'rare', bonus: { attackBonus: 5, expBonus: 5 }, price: 4000, requiredLevel: 25, owned: false, active: false },
+        { id: 'golem_pet', name: '골렘', icon: '🗿', rarity: 'epic', bonus: { attackBonus: 15 }, price: 8000, requiredLevel: 35, owned: false, active: false },
+        { id: 'phoenix_pet', name: '불사조', icon: '🔥', rarity: 'legendary', bonus: { hpRegen: 5, mpRegen: 3, expBonus: 20 }, price: 50000, requiredLevel: 50, owned: false, active: false },
+        { id: 'unicorn_pet', name: '유니콘', icon: '🦄', rarity: 'legendary', bonus: { goldBonus: 30, expBonus: 30, attackBonus: 20 }, price: 100000, requiredLevel: 70, owned: false, active: false },
+    ]);
+
+    // 업적 시스템
+    const [achievements, setAchievements] = useState<Achievement[]>([
+        { id: 'kill_100', name: '초보 사냥꾼', description: '몬스터 100마리 처치', icon: '🗡️', category: 'combat', requirement: 100, current: 0, completed: false, claimed: false, reward: { gold: 500, title: 'novice_hunter' } },
+        { id: 'kill_1000', name: '숙련된 사냥꾼', description: '몬스터 1000마리 처치', icon: '⚔️', category: 'combat', requirement: 1000, current: 0, completed: false, claimed: false, reward: { gold: 2000, title: 'skilled_hunter' } },
+        { id: 'kill_10000', name: '전설의 사냥꾼', description: '몬스터 10000마리 처치', icon: '🏆', category: 'combat', requirement: 10000, current: 0, completed: false, claimed: false, reward: { gold: 10000, title: 'legendary_hunter' } },
+        { id: 'damage_10000', name: '파괴자', description: '누적 데미지 10000', icon: '💥', category: 'combat', requirement: 10000, current: 0, completed: false, claimed: false, reward: { gold: 1000 } },
+        { id: 'damage_100000', name: '대파괴자', description: '누적 데미지 100000', icon: '🔥', category: 'combat', requirement: 100000, current: 0, completed: false, claimed: false, reward: { gold: 5000, title: 'destroyer' } },
+        { id: 'level_10', name: '성장 중', description: '레벨 10 달성', icon: '📈', category: 'growth', requirement: 10, current: 1, completed: false, claimed: false, reward: { gold: 300 } },
+        { id: 'level_30', name: '중급 모험가', description: '레벨 30 달성', icon: '⭐', category: 'growth', requirement: 30, current: 1, completed: false, claimed: false, reward: { gold: 1000, title: 'adventurer' } },
+        { id: 'level_50', name: '상급 모험가', description: '레벨 50 달성', icon: '🌟', category: 'growth', requirement: 50, current: 1, completed: false, claimed: false, reward: { gold: 3000, title: 'elite_adventurer' } },
+        { id: 'level_100', name: '영웅', description: '레벨 100 달성', icon: '👑', category: 'growth', requirement: 100, current: 1, completed: false, claimed: false, reward: { gold: 10000, title: 'hero' } },
+        { id: 'gold_10000', name: '부자', description: '골드 10000 보유', icon: '💰', category: 'wealth', requirement: 10000, current: 0, completed: false, claimed: false, reward: { exp: 1000 } },
+        { id: 'gold_100000', name: '대부호', description: '골드 100000 보유', icon: '💎', category: 'wealth', requirement: 100000, current: 0, completed: false, claimed: false, reward: { exp: 5000, title: 'tycoon' } },
+        { id: 'combo_50', name: '콤보 마스터', description: '50 콤보 달성', icon: '🔗', category: 'combat', requirement: 50, current: 0, completed: false, claimed: false, reward: { gold: 1000 } },
+        { id: 'combo_100', name: '콤보 레전드', description: '100 콤보 달성', icon: '⛓️', category: 'combat', requirement: 100, current: 0, completed: false, claimed: false, reward: { gold: 3000, title: 'combo_master' } },
+        { id: 'kill_500', name: '베테랑', description: '몬스터 500마리 처치', icon: '🎖️', category: 'combat', requirement: 500, current: 0, completed: false, claimed: false, reward: { gold: 1000 } },
+        { id: 'kill_5000', name: '학살자', description: '몬스터 5000마리 처치', icon: '☠️', category: 'combat', requirement: 5000, current: 0, completed: false, claimed: false, reward: { gold: 5000, title: 'slayer' } },
+        { id: 'level_20', name: '견습 전사', description: '레벨 20 달성', icon: '🛡️', category: 'growth', requirement: 20, current: 1, completed: false, claimed: false, reward: { gold: 500 } },
+        { id: 'level_70', name: '마스터', description: '레벨 70 달성', icon: '🎯', category: 'growth', requirement: 70, current: 1, completed: false, claimed: false, reward: { gold: 5000, title: 'master' } },
+        { id: 'gold_50000', name: '재벌', description: '골드 50000 보유', icon: '🏦', category: 'wealth', requirement: 50000, current: 0, completed: false, claimed: false, reward: { exp: 3000 } },
+    ]);
+
+    // 칭호 시스템
+    const [titles, setTitles] = useState<Title[]>([
+        { id: 'novice', name: '초보 모험가', description: '여정을 시작한 자', color: '#aaaaaa', bonus: {}, equipped: true, unlocked: true },
+        { id: 'novice_hunter', name: '초보 사냥꾼', description: '100마리를 처치한 자', color: '#55ff55', bonus: { attack: 2 }, equipped: false, unlocked: false },
+        { id: 'skilled_hunter', name: '숙련된 사냥꾼', description: '1000마리를 처치한 자', color: '#5555ff', bonus: { attack: 5, critRate: 2 }, equipped: false, unlocked: false },
+        { id: 'legendary_hunter', name: '전설의 사냥꾼', description: '10000마리를 처치한 자', color: '#ff55ff', bonus: { attack: 15, critRate: 5 }, equipped: false, unlocked: false },
+        { id: 'destroyer', name: '파괴자', description: '엄청난 데미지를 준 자', color: '#ff5555', bonus: { attack: 10 }, equipped: false, unlocked: false },
+        { id: 'adventurer', name: '모험가', description: '레벨 30을 달성한 자', color: '#55ffff', bonus: { expBonus: 5 }, equipped: false, unlocked: false },
+        { id: 'elite_adventurer', name: '정예 모험가', description: '레벨 50을 달성한 자', color: '#ffff55', bonus: { expBonus: 10, attack: 5 }, equipped: false, unlocked: false },
+        { id: 'hero', name: '영웅', description: '레벨 100을 달성한 자', color: '#ff8800', bonus: { expBonus: 15, attack: 10, defense: 5 }, equipped: false, unlocked: false },
+        { id: 'tycoon', name: '대부호', description: '막대한 부를 축적한 자', color: '#ffdd00', bonus: { expBonus: 10 }, equipped: false, unlocked: false },
+        { id: 'combo_master', name: '콤보 마스터', description: '100 콤보를 달성한 자', color: '#dd00ff', bonus: { attack: 8, critRate: 3 }, equipped: false, unlocked: false },
+        { id: 'slayer', name: '학살자', description: '5000마리를 처치한 자', color: '#880000', bonus: { attack: 12, critRate: 4 }, equipped: false, unlocked: false },
+        { id: 'master', name: '마스터', description: '레벨 70을 달성한 자', color: '#00ffaa', bonus: { expBonus: 12, attack: 8 }, equipped: false, unlocked: false },
+    ]);
+
+    // 게임 통계
+    const [gameStats, setGameStats] = useState<GameStats>({
+        totalKills: 0,
+        totalDamageDealt: 0,
+        totalGoldEarned: 0,
+        totalExpEarned: 0,
+        highestCombo: 0,
+        totalDeaths: 0,
+        playTime: 0,
+        dungeonsCleared: 0,
+        bossesKilled: 0,
+    });
+
+    // 게임 설정
+    const [settings, setSettings] = useState<GameSettings>({
+        bgmVolume: 70,
+        sfxVolume: 80,
+        showDamageNumbers: true,
+        showMinimap: true,
+        autoLoot: true,
+        screenShake: true,
+    });
+
+    // 일일 보상 시스템
+    const [dailyReward, setDailyReward] = useState({
+        lastClaimed: '',
+        streak: 0,
+        canClaim: true,
+    });
+
+    // 레벨업 알림
+    const [levelUpNotification, setLevelUpNotification] = useState<{ show: boolean; level: number }>({ show: false, level: 0 });
+
+    // 게임 이벤트 핸들러
+    const handlePlayerUpdate = useCallback((stats: PlayerStats) => {
+        // 레벨업 체크
+        if (stats.level > playerStats.level) {
+            setLevelUpNotification({ show: true, level: stats.level });
+            setTimeout(() => setLevelUpNotification({ show: false, level: 0 }), 3000);
+        }
+
+        setPlayerStats(stats);
+        // 레벨 퀘스트 업데이트
+        setQuests(prev => prev.map(quest => {
+            if (quest.objectives[0].type === 'level') {
+                const newCurrent = stats.level;
+                const completed = newCurrent >= quest.objectives[0].required;
+                return {
+                    ...quest,
+                    objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                    completed,
+                };
+            }
+            return quest;
+        }));
+        // 업적 업데이트
+        setAchievements(prev => prev.map(ach => {
+            if (ach.category === 'growth' && ach.id.startsWith('level_')) {
+                const newCurrent = stats.level;
+                return { ...ach, current: newCurrent, completed: newCurrent >= ach.requirement };
+            }
+            if (ach.category === 'wealth' && ach.id.startsWith('gold_')) {
+                return { ...ach, current: stats.gold, completed: stats.gold >= ach.requirement };
+            }
+            return ach;
+        }));
+    }, [playerStats.level]);
+
+    const handleAddItem = useCallback((item: InventoryItem) => {
+        setInventory((prev) => {
+            const existing = prev.find((i) => i.id === item.id);
+            if (existing) {
+                return prev.map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+                );
+            }
+            return [...prev, item];
+        });
+    }, []);
+
+    const handleGoldChange = useCallback((amount: number) => {
+        setPlayerStats((prev) => {
+            const newGold = prev.gold + amount;
+            // 골드 퀘스트 업데이트
+            if (amount > 0) {
+                setQuests(prevQuests => prevQuests.map(quest => {
+                    if (quest.objectives[0].type === 'collect' && quest.objectives[0].target === 'gold') {
+                        const newCurrent = Math.min(quest.objectives[0].current + amount, quest.objectives[0].required);
+                        return {
+                            ...quest,
+                            objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                            completed: newCurrent >= quest.objectives[0].required,
+                        };
+                    }
+                    return quest;
+                }));
+                setGameStats(prev => ({ ...prev, totalGoldEarned: prev.totalGoldEarned + amount }));
+            }
+            return { ...prev, gold: newGold };
+        });
+    }, []);
+
+    const handleMonsterKilled = useCallback(() => {
+        setQuests(prev => prev.map(quest => {
+            if (quest.objectives[0].type === 'kill') {
+                const newCurrent = Math.min(quest.objectives[0].current + 1, quest.objectives[0].required);
+                return {
+                    ...quest,
+                    objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                    completed: newCurrent >= quest.objectives[0].required,
+                };
+            }
+            return quest;
+        }));
+        setGameStats(prev => {
+            const newKills = prev.totalKills + 1;
+            // 업적 업데이트
+            setAchievements(prevAch => prevAch.map(ach => {
+                if (ach.id.startsWith('kill_')) {
+                    return { ...ach, current: newKills, completed: newKills >= ach.requirement };
+                }
+                return ach;
+            }));
+            return { ...prev, totalKills: newKills };
+        });
+    }, []);
+
+    const handleCombatStatsUpdate = useCallback((stats: CombatStats) => {
+        setCombatStats(stats);
+        setGameStats(prev => ({
+            ...prev,
+            totalDamageDealt: prev.totalDamageDealt + (stats.totalDamage - prev.totalDamageDealt),
+        }));
+    }, []);
+
+    const handleMinimapUpdate = useCallback((data: MinimapData) => {
+        setMinimapData(data);
+    }, []);
+
+    const handleAutoAttackToggle = useCallback((enabled: boolean) => {
+        setIsAutoAttack(enabled);
+    }, []);
+
+    const handleAddBuff = useCallback((buff: ActiveBuff) => {
+        setActiveBuffs(prev => {
+            const existing = prev.find(b => b.id === buff.id);
+            if (existing) {
+                return prev.map(b => b.id === buff.id ? buff : b);
+            }
+            return [...prev, buff];
+        });
+    }, []);
+
+    const handleComboUpdate = useCallback((combo: number) => {
+        setGameStats(prev => ({
+            ...prev,
+            highestCombo: Math.max(prev.highestCombo, combo),
+        }));
+        setAchievements(prev => prev.map(ach => {
+            if (ach.id.startsWith('combo_')) {
+                return { ...ach, current: Math.max(ach.current, combo), completed: combo >= ach.requirement };
+            }
+            return ach;
+        }));
+    }, []);
+
+    // 퀘스트 보상 수령
+    const handleClaimQuest = useCallback((questId: string) => {
+        const quest = quests.find(q => q.id === questId);
+        if (quest && quest.completed && !quest.claimed) {
+            // 보상 지급
+            if (quest.rewards.exp) {
+                setPlayerStats(prev => ({
+                    ...prev,
+                    exp: prev.exp + quest.rewards.exp!,
+                }));
+            }
+            if (quest.rewards.gold) {
+                setPlayerStats(prev => ({
+                    ...prev,
+                    gold: prev.gold + quest.rewards.gold!,
+                }));
+            }
+            // 퀘스트 완료 처리
+            setQuests(prev => prev.map(q =>
+                q.id === questId ? { ...q, claimed: true } : q
+            ));
+        }
+    }, [quests]);
+
+    // 아이템 판매
+    const handleSellItem = useCallback((itemId: string, quantity: number = 1) => {
+        const item = inventory.find(i => i.id === itemId);
+        if (!item) return;
+
+        const sellPrice = (item.sellPrice || Math.floor(item.price / 2)) * quantity;
+
+        setInventory(prev => {
+            const updated = prev.map(i => {
+                if (i.id === itemId) {
+                    return { ...i, quantity: i.quantity - quantity };
+                }
+                return i;
+            }).filter(i => i.quantity > 0);
+            return updated;
+        });
+
+        setPlayerStats(prev => ({
+            ...prev,
+            gold: prev.gold + sellPrice,
+        }));
+
+        // 퀵슬롯에서도 제거
+        setQuickSlots(prev => prev.map(slot => {
+            if (slot.item?.id === itemId) {
+                const remaining = inventory.find(i => i.id === itemId);
+                if (!remaining || remaining.quantity <= quantity) {
+                    return { ...slot, item: null };
+                }
+            }
+            return slot;
+        }));
+    }, [inventory]);
+
+    // 펫 구매
+    const handleBuyPet = useCallback((petId: string) => {
+        const pet = pets.find(p => p.id === petId);
+        if (!pet || pet.owned || playerStats.gold < pet.price || playerStats.level < pet.requiredLevel) return;
+
+        setPlayerStats(prev => ({ ...prev, gold: prev.gold - pet.price }));
+        setPets(prev => prev.map(p => p.id === petId ? { ...p, owned: true } : p));
+    }, [pets, playerStats]);
+
+    // 펫 활성화
+    const handleActivatePet = useCallback((petId: string) => {
+        setPets(prev => prev.map(p => ({
+            ...p,
+            active: p.id === petId && p.owned,
+        })));
+    }, []);
+
+    // 업적 보상 수령
+    const handleClaimAchievement = useCallback((achId: string) => {
+        const ach = achievements.find(a => a.id === achId);
+        if (!ach || !ach.completed || ach.claimed) return;
+
+        if (ach.reward.gold) {
+            setPlayerStats(prev => ({ ...prev, gold: prev.gold + ach.reward.gold! }));
+        }
+        if (ach.reward.exp) {
+            setPlayerStats(prev => ({ ...prev, exp: prev.exp + ach.reward.exp! }));
+        }
+        if (ach.reward.title) {
+            setTitles(prev => prev.map(t => t.id === ach.reward.title ? { ...t, unlocked: true } : t));
+        }
+        setAchievements(prev => prev.map(a => a.id === achId ? { ...a, claimed: true } : a));
+    }, [achievements]);
+
+    // 칭호 장착
+    const handleEquipTitle = useCallback((titleId: string) => {
+        setTitles(prev => prev.map(t => ({
+            ...t,
+            equipped: t.id === titleId && t.unlocked,
+        })));
+    }, []);
+
+    // 일일 보상 수령
+    const handleClaimDailyReward = useCallback(() => {
+        const today = new Date().toDateString();
+        if (dailyReward.lastClaimed === today) return;
+
+        const baseGold = 100 * (1 + dailyReward.streak * 0.1);
+        const baseExp = 50 * (1 + dailyReward.streak * 0.1);
+
+        setPlayerStats(prev => ({
+            ...prev,
+            gold: prev.gold + Math.floor(baseGold),
+            exp: prev.exp + Math.floor(baseExp),
+        }));
+
+        setDailyReward(prev => ({
+            lastClaimed: today,
+            streak: prev.lastClaimed === new Date(Date.now() - 86400000).toDateString() ? prev.streak + 1 : 1,
+            canClaim: false,
+        }));
+
+        setShowDailyReward(false);
+    }, [dailyReward]);
+
+    // 세이브/로드 시스템
+    const saveGame = useCallback(() => {
+        const saveData = {
+            playerStats,
+            inventory,
+            skills,
+            quickSlots,
+            pets,
+            achievements,
+            titles,
+            gameStats,
+            settings,
+            dailyReward,
+            quests,
+        };
+        localStorage.setItem('windKingdomSave', JSON.stringify(saveData));
+    }, [playerStats, inventory, skills, quickSlots, pets, achievements, titles, gameStats, settings, dailyReward, quests]);
+
+    const loadGame = useCallback(() => {
+        const saved = localStorage.getItem('windKingdomSave');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (data.playerStats) setPlayerStats(data.playerStats);
+                if (data.inventory) setInventory(data.inventory);
+                if (data.skills) setSkills(data.skills);
+                if (data.quickSlots) setQuickSlots(data.quickSlots);
+                if (data.pets) setPets(data.pets);
+                if (data.achievements) setAchievements(data.achievements);
+                if (data.titles) setTitles(data.titles);
+                if (data.gameStats) setGameStats(data.gameStats);
+                if (data.settings) setSettings(data.settings);
+                if (data.dailyReward) setDailyReward(data.dailyReward);
+                if (data.quests) setQuests(data.quests);
+            } catch (e) {
+                console.error('Failed to load save:', e);
+            }
+        }
+    }, []);
+
+    // 자동 저장
+    useEffect(() => {
+        const interval = setInterval(saveGame, 60000);
+        return () => clearInterval(interval);
+    }, [saveGame]);
+
+    // 게임 로드
+    useEffect(() => {
+        loadGame();
+        // 일일 보상 체크
+        const today = new Date().toDateString();
+        setDailyReward(prev => ({
+            ...prev,
+            canClaim: prev.lastClaimed !== today,
+        }));
+    }, [loadGame]);
+
+    // 쿨다운 업데이트
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setSkills((prev) =>
+                prev.map((skill) => ({
+                    ...skill,
+                    currentCooldown: Math.max(0, skill.currentCooldown - 100),
+                }))
+            );
+            // 버프 시간 업데이트
+            setActiveBuffs(prev =>
+                prev
+                    .map(buff => ({ ...buff, remainingTime: buff.remainingTime - 0.1 }))
+                    .filter(buff => buff.remainingTime > 0)
+            );
+            // 펫 효과 적용
+            const activePet = pets.find(p => p.active);
+            if (activePet) {
+                if (activePet.bonus.hpRegen) {
+                    setPlayerStats(prev => ({
+                        ...prev,
+                        hp: Math.min(prev.maxHp, prev.hp + activePet.bonus.hpRegen! * 0.1),
+                    }));
+                }
+                if (activePet.bonus.mpRegen) {
+                    setPlayerStats(prev => ({
+                        ...prev,
+                        mp: Math.min(prev.maxMp, prev.mp + activePet.bonus.mpRegen! * 0.1),
+                    }));
+                }
+            }
+        }, 100);
+        return () => clearInterval(interval);
+    }, [pets]);
+
+    // 키보드 이벤트 핸들러 - ESC로 모든 창 닫기
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // ESC 키 처리 - 열린 모달을 순서대로 닫음 (뒤로가기)
+            if (e.key === 'Escape') {
+                if (showDailyReward) {
+                    setShowDailyReward(false);
+                    return;
+                }
+                if (showInventory) {
+                    setShowInventory(false);
+                    return;
+                }
+                if (showSkillBar) {
+                    setShowSkillBar(false);
+                    return;
+                }
+                if (showQuestPanel) {
+                    setShowQuestPanel(false);
+                    return;
+                }
+                if (showSettings) {
+                    setShowSettings(false);
+                    return;
+                }
+                if (showAchievements) {
+                    setShowAchievements(false);
+                    return;
+                }
+                if (showPetShop) {
+                    setShowPetShop(false);
+                    return;
+                }
+                if (showStats) {
+                    setShowStats(false);
+                    return;
+                }
+                if (showCodeViewer) {
+                    setShowCodeViewer(false);
+                    return;
+                }
+                // 아무 창도 없으면 던전 셀렉터 토글
+                setShowDungeonSelector(prev => !prev);
+                return;
+            }
+
+            if (e.key.toLowerCase() === 'i') {
+                setShowInventory((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'w' && !e.ctrlKey) {
+                setShowSkillBar((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'j') {
+                setShowQuestPanel((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'o') {
+                setShowSettings((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'p') {
+                setShowAchievements((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'l') {
+                setShowPetShop((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'k') {
+                setShowStats((prev) => !prev);
+            }
+
+            // 퀵슬롯 사용
+            const quickSlotKeys = ['q', 'e', 'r', 't', 'f'];
+            const keyIndex = quickSlotKeys.indexOf(e.key.toLowerCase());
+            if (keyIndex !== -1) {
+                const slot = quickSlots[keyIndex];
+                if (slot.item && slot.item.type === 'consumable') {
+                    useQuickSlotItem(keyIndex);
+                }
+            }
+
+            // 스킬 사용 (1-9)
+            const skillIndex = parseInt(e.key) - 1;
+            if (skillIndex >= 0 && skillIndex < skills.length) {
+                useSkill(skillIndex);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [quickSlots, skills, showInventory, showDungeonSelector, showSkillBar, showQuestPanel, showCodeViewer, showSettings, showAchievements, showPetShop, showStats, showDailyReward]);
+
+    // 스킬 사용
+    const useSkill = (index: number) => {
+        const skill = skills[index];
+        if (!skill) return;
+        if (skill.currentCooldown > 0) return;
+        if (playerStats.mp < skill.mpCost) return;
+        if (playerStats.level < skill.requiredLevel) return;
+
+        // MP 소모
+        setPlayerStats((prev) => ({
+            ...prev,
+            mp: prev.mp - skill.mpCost,
+        }));
+
+        // 쿨다운 시작
+        setSkills((prev) =>
+            prev.map((s, i) =>
+                i === index ? { ...s, currentCooldown: s.cooldown } : s
+            )
+        );
+
+        // 힐 스킬 처리
+        if (skill.id === 'heal') {
+            setPlayerStats((prev) => ({
+                ...prev,
+                hp: Math.min(prev.maxHp, prev.hp + 30),
+            }));
+        }
+
+        // 버프 스킬 처리
+        if (skill.id === 'battle_cry') {
+            const buff: ActiveBuff = {
+                id: 'battle_cry_buff',
+                name: '전투함성',
+                icon: '📯',
+                duration: 10,
+                remainingTime: 10,
+                effect: { attack: 50 },
+            };
+            handleAddBuff(buff);
+            GameEventBus.emit('ADD_BUFF', buff);
+        }
+
+        // 게임에 스킬 이벤트 전달
+        GameEventBus.emit('USE_SKILL', skill);
+    };
+
+    // 퀵슬롯 아이템 사용
+    const useQuickSlotItem = (slotIndex: number) => {
+        const slot = quickSlots[slotIndex];
+        if (!slot.item) return;
+
+        const item = slot.item;
+        if (item.effect) {
+            setPlayerStats((prev) => ({
+                ...prev,
+                hp: Math.min(prev.maxHp, prev.hp + (item.effect?.hp || 0)),
+                mp: Math.min(prev.maxMp, prev.mp + (item.effect?.mp || 0)),
+            }));
+        }
+
+        // 인벤토리에서 수량 감소
+        setInventory((prev) =>
+            prev
+                .map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                )
+                .filter((i) => i.quantity > 0)
+        );
+
+        // 퀵슬롯 업데이트
+        setQuickSlots((prev) =>
+            prev.map((s, i) => {
+                if (i === slotIndex) {
+                    const remainingItem = inventory.find(
+                        (inv) => inv.id === item.id && inv.quantity > 1
+                    );
+                    return { ...s, item: remainingItem || null };
+                }
+                return s;
+            })
+        );
+    };
+
+    // 퀵슬롯에 아이템 등록
+    const assignToQuickSlot = (slotIndex: number, item: InventoryItem) => {
+        setQuickSlots((prev) =>
+            prev.map((s, i) => (i === slotIndex ? { ...s, item } : s))
+        );
+    };
+
+    // 던전 선택
+    const handleSelectDungeon = (dungeonLevel: number) => {
+        setShowDungeonSelector(false);
+        setCombatStats({
+            totalDamage: 0,
+            killCount: 0,
+            critCount: 0,
+            hitCount: 0,
+            startTime: Date.now(),
+            dps: 0,
+        });
+        GameEventBus.emit('CHANGE_SCENE', {
+            scene: 'DungeonScene',
+            data: { dungeonLevel },
+        });
+        setCurrentScene('dungeon');
+    };
+
+    // 마을로 귀환
+    const handleReturnToTown = () => {
+        setShowDungeonSelector(false);
+        setMinimapData(null);
+        GameEventBus.emit('CHANGE_SCENE', { scene: 'TownScene' });
+        setCurrentScene('town');
+    };
+
+    // Phaser 게임 초기화
+    useEffect(() => {
+        if (gameRef.current) return;
+
+        gameRef.current = new Phaser.Game(gameConfig);
+
+        // 이벤트 리스너 등록
+        GameEventBus.on('PLAYER_UPDATE', handlePlayerUpdate);
+        GameEventBus.on('ADD_ITEM', handleAddItem);
+        GameEventBus.on('GOLD_CHANGE', handleGoldChange);
+        GameEventBus.on('MONSTER_KILLED', handleMonsterKilled);
+        GameEventBus.on('COMBAT_STATS_UPDATE', handleCombatStatsUpdate);
+        GameEventBus.on('MINIMAP_UPDATE', handleMinimapUpdate);
+        GameEventBus.on('AUTO_ATTACK_TOGGLE', handleAutoAttackToggle);
+        GameEventBus.on('ADD_BUFF', handleAddBuff);
+        GameEventBus.on('COMBO_UPDATE', handleComboUpdate);
+        GameEventBus.on('SCENE_CHANGED', (scene: string) => setCurrentScene(scene));
+        GameEventBus.on('TOGGLE_DUNGEON_MENU', () => setShowDungeonSelector(prev => !prev));
+        GameEventBus.on('TOGGLE_INVENTORY', () => setShowInventory(prev => !prev));
+        GameEventBus.on('TOGGLE_SKILL_MENU', () => setShowSkillBar(prev => !prev));
+        GameEventBus.on('TOGGLE_QUEST_PANEL', () => setShowQuestPanel(prev => !prev));
+
+        return () => {
+            GameEventBus.off('PLAYER_UPDATE', handlePlayerUpdate);
+            GameEventBus.off('ADD_ITEM', handleAddItem);
+            GameEventBus.off('GOLD_CHANGE', handleGoldChange);
+            GameEventBus.off('MONSTER_KILLED', handleMonsterKilled);
+            GameEventBus.off('COMBAT_STATS_UPDATE', handleCombatStatsUpdate);
+            GameEventBus.off('MINIMAP_UPDATE', handleMinimapUpdate);
+            GameEventBus.off('AUTO_ATTACK_TOGGLE', handleAutoAttackToggle);
+            GameEventBus.off('ADD_BUFF', handleAddBuff);
+            GameEventBus.off('COMBO_UPDATE', handleComboUpdate);
+            gameRef.current?.destroy(true);
+            gameRef.current = null;
+        };
+    }, [handlePlayerUpdate, handleAddItem, handleGoldChange, handleMonsterKilled, handleCombatStatsUpdate, handleMinimapUpdate, handleAutoAttackToggle, handleAddBuff, handleComboUpdate]);
+
+    const activePet = pets.find(p => p.active);
+    const equippedTitle = titles.find(t => t.equipped);
+
+    return (
+        <div className= "relative w-screen h-screen overflow-hidden bg-black" >
+        {/* Phaser 게임 컨테이너 */ }
+        < div id = "game-container" className = "absolute inset-0" />
+
+            {/* React UI 오버레이 */ }
+            < HUD
+    playerStats = { playerStats }
+    quickSlots = { quickSlots }
+    skills = { skills }
+    currentScene = { currentScene }
+    activeBuffs = { activeBuffs }
+    isAutoAttack = { isAutoAttack }
+    combatStats = { currentScene === 'dungeon' ? combatStats : undefined
+}
+minimapData = { currentScene === 'dungeon' ? minimapData : undefined}
+activePet = { activePet }
+equippedTitle = { equippedTitle }
+    />
+
+    {/* 레벨업 알림 - 우측 하단 */ }
+{
+    levelUpNotification.show && (
+        <div className="fixed bottom-24 right-4 z-50 animate-bounce" >
+            <div className="bg-gradient-to-r from-yellow-600 to-yellow-400 text-black px-6 py-3 rounded-lg shadow-lg border-2 border-yellow-300" >
+                <div className="flex items-center gap-2" >
+                    <span className="text-2xl" >🎉</span>
+                        < div >
+                        <div className="font-bold text-lg" > 레벨 업! </div>
+                            < div className = "text-sm" > Lv.{ levelUpNotification.level } 달성! </div>
+                                </div>
+                                </div>
+                                </div>
+                                </div>
+      )
+}
+
+{/* 빠른 접근 버튼 */ }
+<div className="fixed top-4 right-4 flex gap-2 z-40" >
+{
+    dailyReward.canClaim && (
+        <button
+            onClick={ () => setShowDailyReward(true) }
+className = "px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg animate-pulse"
+    >
+            🎁
+</button>
+        )}
+<button
+          onClick={ () => setShowSettings(true) }
+className = "px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+    >
+          ⚙️
+</button>
+    < button
+onClick = {() => setShowAchievements(true)}
+className = "px-3 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg"
+    >
+          🏆
+</button>
+    < button
+onClick = {() => setShowPetShop(true)}
+className = "px-3 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg"
+    >
+          🐾
+</button>
+    < button
+onClick = {() => setShowStats(true)}
+className = "px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg"
+    >
+          📊
+</button>
+    </div>
+
+{/* 인벤토리 */ }
+{
+    showInventory && (
+        <Inventory
+          items={ inventory }
+    onClose = {() => setShowInventory(false)
+}
+onUseItem = {(item) => {
+    if (item.type === 'consumable' && item.effect) {
+        setPlayerStats((prev) => ({
+            ...prev,
+            hp: Math.min(prev.maxHp, prev.hp + (item.effect?.hp || 0)),
+            mp: Math.min(prev.maxMp, prev.mp + (item.effect?.mp || 0)),
+        }));
+        setInventory((prev) =>
+            prev
+                .map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                )
+                .filter((i) => i.quantity > 0)
+        );
+    }
+}}
+onAssignQuickSlot = { assignToQuickSlot }
+onSellItem = { handleSellItem }
+gold = { playerStats.gold }
+    />
+      )}
+
+{/* 스킬 바 */ }
+{
+    showSkillBar && (
+        <SkillBar
+          skills={ skills }
+    playerLevel = { playerStats.level }
+    playerMp = { playerStats.mp }
+    onClose = {() => setShowSkillBar(false)
+}
+onUseSkill = { useSkill }
+    />
+      )}
+
+{/* 던전 선택 */ }
+{
+    showDungeonSelector && (
+        <DungeonSelector
+          playerLevel={ playerStats.level }
+    onSelect = { handleSelectDungeon }
+    onClose = {() => setShowDungeonSelector(false)
+}
+onReturnToTown = { currentScene === 'dungeon' ? handleReturnToTown : undefined}
+        />
+      )}
+
+{/* 퀘스트 패널 */ }
+{
+    showQuestPanel && (
+        <QuestPanel
+          quests={ quests }
+    onClose = {() => setShowQuestPanel(false)
+}
+onClaimReward = { handleClaimQuest }
+    />
+      )}
+
+{/* 설정 창 */ }
+{
+    showSettings && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" >
+            <div className="bg-gray-900 border-2 border-gray-600 rounded-lg p-6 w-96" >
+                <div className="flex justify-between items-center mb-4" >
+                    <h2 className="text-xl font-bold text-white" >⚙️ 설정 </h2>
+                        < button onClick = {() => setShowSettings(false)
+} className = "text-gray-400 hover:text-white text-2xl" >& times; </button>
+    </div>
+    < div className = "space-y-4" >
+        <div>
+        <label className="text-gray-300 text-sm" > 배경 음악 </label>
+            < input
+type = "range"
+min = "0"
+max = "100"
+value = { settings.bgmVolume }
+onChange = {(e) => setSettings(prev => ({ ...prev, bgmVolume: parseInt(e.target.value) }))}
+className = "w-full"
+    />
+    </div>
+    < div >
+    <label className="text-gray-300 text-sm" > 효과음 </label>
+        < input
+type = "range"
+min = "0"
+max = "100"
+value = { settings.sfxVolume }
+onChange = {(e) => setSettings(prev => ({ ...prev, sfxVolume: parseInt(e.target.value) }))}
+className = "w-full"
+    />
+    </div>
+    < div className = "flex items-center justify-between" >
+        <span className="text-gray-300" > 데미지 숫자 표시 </span>
+            < input
+type = "checkbox"
+checked = { settings.showDamageNumbers }
+onChange = {(e) => setSettings(prev => ({ ...prev, showDamageNumbers: e.target.checked }))}
+                />
+    </div>
+    < div className = "flex items-center justify-between" >
+        <span className="text-gray-300" > 미니맵 표시 </span>
+            < input
+type = "checkbox"
+checked = { settings.showMinimap }
+onChange = {(e) => setSettings(prev => ({ ...prev, showMinimap: e.target.checked }))}
+                />
+    </div>
+    < div className = "flex items-center justify-between" >
+        <span className="text-gray-300" > 아이템 자동 획득 </span>
+            < input
+type = "checkbox"
+checked = { settings.autoLoot }
+onChange = {(e) => setSettings(prev => ({ ...prev, autoLoot: e.target.checked }))}
+                />
+    </div>
+    < div className = "pt-4 space-y-2" >
+        <button
+                  onClick={ saveGame }
+className = "w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded"
+    >
+                  💾 저장하기
+    </button>
+    < button
+onClick = {() => {
+    if (confirm('정말 게임 데이터를 초기화하시겠습니까?')) {
+        localStorage.removeItem('windKingdomSave');
+        window.location.reload();
+    }
+}}
+className = "w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded"
+    >
+                  🗑️ 데이터 초기화
+    </button>
+    </div>
+    </div>
+    </div>
+    </div>
+      )}
+
+{/* 업적/칭호 창 */ }
+{
+    showAchievements && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" >
+            <div className="bg-gray-900 border-2 border-purple-600 rounded-lg p-6 w-[700px] max-h-[80vh] overflow-y-auto" >
+                <div className="flex justify-between items-center mb-4" >
+                    <h2 className="text-xl font-bold text-white" >🏆 업적 & 칭호 </h2>
+                        < button onClick = {() => setShowAchievements(false)
+} className = "text-gray-400 hover:text-white text-2xl" >& times; </button>
+    </div>
+
+{/* 현재 칭호 */ }
+<div className="mb-4 p-3 bg-gray-800 rounded" >
+    <div className="text-sm text-gray-400 mb-1" > 현재 칭호 </div>
+        < div className = "text-lg" style = {{ color: equippedTitle?.color }}>
+            { equippedTitle?.name || '없음'}
+</div>
+    </div>
+
+{/* 칭호 목록 */ }
+<div className="mb-6" >
+    <h3 className="text-lg font-bold text-yellow-400 mb-2" > 칭호 </h3>
+        < div className = "grid grid-cols-2 gap-2" >
+        {
+            titles.map(title => (
+                <div
+                    key= { title.id }
+                    className = {`p-2 rounded border ${title.unlocked ? 'border-yellow-600 bg-gray-800' : 'border-gray-700 bg-gray-900 opacity-50'}`}
+            >
+            <div className="flex justify-between items-center" >
+                <span style={ { color: title.unlocked ? title.color : '#666' } }> { title.name } </span>
+{
+    title.unlocked && !title.equipped && (
+        <button
+                          onClick={ () => handleEquipTitle(title.id) }
+    className = "text-xs px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded"
+        >
+        장착
+        </button>
+                      )
+}
+{ title.equipped && <span className="text-xs text-green-400" > 장착중 </span> }
+</div>
+    < div className = "text-xs text-gray-400" > { title.description } </div>
+{
+    Object.entries(title.bonus).length > 0 && (
+        <div className="text-xs text-green-400 mt-1" >
+        {
+            Object.entries(title.bonus).map(([key, value]) => (
+                <span key= { key } className = "mr-2" > +{ value } { key } </span>
+            ))
+        }
+            </div>
+                    )
+}
+</div>
+                ))}
+</div>
+    </div>
+
+{/* 업적 목록 */ }
+<div>
+    <h3 className="text-lg font-bold text-purple-400 mb-2" > 업적 </h3>
+        < div className = "space-y-2" >
+        {
+            achievements.map(ach => (
+                <div
+                    key= { ach.id }
+                    className = {`p-3 rounded border ${ach.completed ? 'border-green-600 bg-gray-800' : 'border-gray-700 bg-gray-900'}`}
+            >
+            <div className="flex justify-between items-center" >
+                <div className="flex items-center gap-2" >
+                    <span className="text-xl" > { ach.icon } </span>
+                        < div >
+                        <div className="font-bold text-white" > { ach.name } </div>
+                            < div className = "text-xs text-gray-400" > { ach.description } </div>
+                                </div>
+                                </div>
+                                < div className = "text-right" >
+                                    <div className="text-sm text-gray-300" >
+                                        { ach.current.toLocaleString() } / { ach.requirement.toLocaleString() }
+                                        </div>
+{
+    ach.completed && !ach.claimed && (
+        <button
+                            onClick={ () => handleClaimAchievement(ach.id) }
+    className = "text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded mt-1"
+        >
+        보상 받기
+            </button>
+                        )
+}
+{ ach.claimed && <span className="text-xs text-gray-500" > 완료 </span> }
+</div>
+    </div>
+    < div className = "mt-2 h-2 bg-gray-700 rounded-full overflow-hidden" >
+        <div
+                        className="h-full bg-purple-500"
+style = {{ width: `${Math.min(100, (ach.current / ach.requirement) * 100)}%` }}
+                      />
+    </div>
+    </div>
+                ))}
+</div>
+    </div>
+    </div>
+    </div>
+      )}
+
+{/* 펫 상점 */ }
+{
+    showPetShop && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" >
+            <div className="bg-gray-900 border-2 border-green-600 rounded-lg p-6 w-[600px] max-h-[80vh] overflow-y-auto" >
+                <div className="flex justify-between items-center mb-4" >
+                    <h2 className="text-xl font-bold text-white" >🐾 펫 상점 </h2>
+                        < button onClick = {() => setShowPetShop(false)
+} className = "text-gray-400 hover:text-white text-2xl" >& times; </button>
+    </div>
+
+{/* 현재 펫 */ }
+{
+    activePet && (
+        <div className="mb-4 p-3 bg-gray-800 rounded border border-green-500" >
+            <div className="text-sm text-gray-400 mb-1" > 활성 펫 </div>
+                < div className = "flex items-center gap-2" >
+                    <span className="text-2xl" > { activePet.icon } </span>
+                        < span className = "text-lg text-white" > { activePet.name } </span>
+                            </div>
+                            </div>
+            )
+}
+
+<div className="grid grid-cols-2 gap-3" >
+{
+    pets.map(pet => {
+        const canBuy = !pet.owned && playerStats.gold >= pet.price && playerStats.level >= pet.requiredLevel;
+        const rarityColor = {
+            common: 'border-gray-500',
+            rare: 'border-blue-500',
+            epic: 'border-purple-500',
+            legendary: 'border-yellow-500',
+        }[pet.rarity];
+
+        return (
+            <div
+                    key= { pet.id }
+        className = {`p-3 rounded border-2 ${rarityColor} ${pet.owned ? 'bg-gray-800' : 'bg-gray-900'}`
+    }
+                  >
+        <div className="flex items-center gap-2 mb-2" >
+    <span className="text-3xl" > { pet.icon } </span>
+    < div >
+    <div className="font-bold text-white" > { pet.name } </div>
+    < div className = "text-xs text-gray-400" > Lv.{ pet.requiredLevel } 이상 </div>
+    </div>
+    </div>
+    < div className = "text-xs text-green-400 mb-2" >
+    { pet.bonus.goldBonus && <div>골드 + { pet.bonus.goldBonus } % </div> }
+                      { pet.bonus.expBonus && <div>경험치 + { pet.bonus.expBonus } % </div> }
+                      { pet.bonus.attackBonus && <div>공격력 + { pet.bonus.attackBonus } % </div> }
+                      { pet.bonus.hpRegen && <div>HP 재생 + { pet.bonus.hpRegen } / 초 </div>}
+{ pet.bonus.mpRegen && <div>MP 재생 + { pet.bonus.mpRegen } / 초 </div> }
+</div>
+{
+    !pet.owned ? (
+        <button
+                        onClick= {() => handleBuyPet(pet.id)
+}
+disabled = {!canBuy}
+className = {`w-full py-1 rounded text-sm ${canBuy ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-700 cursor-not-allowed'}`}
+                      >
+    { pet.price.toLocaleString() } G
+        </button>
+                    ) : (
+    <button
+                        onClick= {() => handleActivatePet(pet.id)}
+className = {`w-full py-1 rounded text-sm ${pet.active ? 'bg-yellow-600' : 'bg-blue-600 hover:bg-blue-500'}`}
+                      >
+    { pet.active ? '활성화됨' : '활성화' }
+    </button>
+                    )}
+</div>
+                );
+              })}
+</div>
+    </div>
+    </div>
+      )}
+
+{/* 통계 창 */ }
+{
+    showStats && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" >
+            <div className="bg-gray-900 border-2 border-blue-600 rounded-lg p-6 w-96" >
+                <div className="flex justify-between items-center mb-4" >
+                    <h2 className="text-xl font-bold text-white" >📊 통계 </h2>
+                        < button onClick = {() => setShowStats(false)
+} className = "text-gray-400 hover:text-white text-2xl" >& times; </button>
+    </div>
+    < div className = "space-y-2 text-gray-300" >
+        <div className="flex justify-between" > <span>총 처치 수 < /span><span className="text-white">{gameStats.totalKills.toLocaleString()}</span > </div>
+            < div className = "flex justify-between" > <span>누적 데미지 < /span><span className="text-white">{gameStats.totalDamageDealt.toLocaleString()}</span > </div>
+                < div className = "flex justify-between" > <span>획득 골드 < /span><span className="text-yellow-400">{gameStats.totalGoldEarned.toLocaleString()}</span > </div>
+                    < div className = "flex justify-between" > <span>최고 콤보 < /span><span className="text-purple-400">{gameStats.highestCombo}</span > </div>
+                        < div className = "flex justify-between" > <span>사망 횟수 < /span><span className="text-red-400">{gameStats.totalDeaths}</span > </div>
+                            < hr className = "border-gray-700" />
+                                <div className="flex justify-between" > <span>분당 처치 < /span><span className="text-green-400">{gameStats.playTime > 0 ? (gameStats.totalKills /(gameStats.playTime / 60)).toFixed(1) : 0}</span></div >
+                                    <div className="flex justify-between" > <span>평균 DPS < /span><span className="text-orange-400">{gameStats.playTime > 0 ? (gameStats.totalDamageDealt / gameStats.playTime).toFixed(0) : 0}</span></div >
+                                        </div>
+                                        </div>
+                                        </div>
+      )}
+
+{/* 일일 보상 */ }
+{
+    showDailyReward && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" >
+            <div className="bg-gray-900 border-2 border-yellow-600 rounded-lg p-6 w-80 text-center" >
+                <h2 className="text-xl font-bold text-yellow-400 mb-4" >🎁 일일 보상 </h2>
+                    < div className = "text-gray-300 mb-4" >
+                        <div>연속 출석: { dailyReward.streak } 일 </div>
+                            < div className = "text-2xl my-4" >
+                💰 { Math.floor(100 * (1 + dailyReward.streak * 0.1)) } 골드 < br />
+                ✨ { Math.floor(50 * (1 + dailyReward.streak * 0.1)) } 경험치
+        </div>
+        </div>
+        < button
+    onClick = { handleClaimDailyReward }
+    disabled = {!dailyReward.canClaim
+}
+className = {`w-full py-2 rounded ${dailyReward.canClaim ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-gray-700'}`}
+            >
+    { dailyReward.canClaim ? '받기' : '이미 받음' }
+    </button>
+    < button
+onClick = {() => setShowDailyReward(false)}
+className = "w-full py-2 mt-2 bg-gray-700 hover:bg-gray-600 rounded"
+    >
+    닫기
+    </button>
+    </div>
+    </div>
+      )}
+
+{/* 코드 뷰어 */ }
+{
+    showCodeViewer && (
+        <CodeViewer onClose={ () => setShowCodeViewer(false) } />
+      )
+}
+
+{/* 코드 보기 버튼 */ }
+<button
+        onClick={ () => setShowCodeViewer(true) }
+className = "absolute bottom-4 left-4 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg border border-gray-600 transition-colors z-50"
+    >
+        📋 코드 보기
+    </button>
+    </div>
+  );
+}
+
+export default App;
+📁 src / game / GameConfig.ts
+TypeScript
+
+import Phaser from 'phaser';
+import { BootScene } from './scenes/BootScene';
+import { TownScene } from './scenes/TownScene';
+import { DungeonScene } from './scenes/DungeonScene';
+
+export const gameConfig: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    parent: 'game-container',
+    width: 1920,
+    height: 1080,
+    pixelArt: true,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { x: 0, y: 0 },
+            debug: false,
+        },
+    },
+    scene: [BootScene, TownScene, DungeonScene],
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+};
+📁 src / game / GameEventBus.ts
+TypeScript
+
+type EventCallback = (...args: unknown[]) => void;
+
+class EventBus {
+    private events: Map<string, EventCallback[]> = new Map();
+
+    on(event: string, callback: EventCallback) {
+        if (!this.events.has(event)) {
+            this.events.set(event, []);
+        }
+        this.events.get(event)!.push(callback);
+    }
+
+    off(event: string, callback: EventCallback) {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            const index = callbacks.indexOf(callback);
+            if (index > -1) {
+                callbacks.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: string, ...args: unknown[]) {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            callbacks.forEach((callback) => callback(...args));
+        }
+    }
+}
+
+export const GameEventBus = new EventBus();
+📁 src / game / scenes / BootScene.ts
+TypeScript
+
+import Phaser from 'phaser';
+
+export class BootScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'BootScene' });
+    }
+
+    preload() {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+
+        const progressBar = this.add.graphics();
+        const progressBox = this.add.graphics();
+        progressBox.fillStyle(0x222222, 0.8);
+        progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
+
+        const loadingText = this.add.text(width / 2, height / 2 - 50, '로딩 중...', {
+            fontSize: '20px',
+            color: '#ffffff',
+        });
+        loadingText.setOrigin(0.5, 0.5);
+
+        this.load.on('progress', (value: number) => {
+            progressBar.clear();
+            progressBar.fillStyle(0x00ff00, 1);
+            progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+        });
+
+        this.load.on('complete', () => {
+            progressBar.destroy();
+            progressBox.destroy();
+            loadingText.destroy();
+        });
+
+        this.createTextures();
+    }
+
+    createTextures() {
+        // 플레이어 캐릭터
+        const playerGraphics = this.make.graphics({ x: 0, y: 0 });
+
+        // 그림자
+        playerGraphics.fillStyle(0x000000, 0.3);
+        playerGraphics.fillEllipse(24, 60, 32, 12);
+
+        // 신발
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRoundedRect(12, 52, 10, 8, 2);
+        playerGraphics.fillRoundedRect(26, 52, 10, 8, 2);
+
+        // 다리
+        playerGraphics.fillStyle(0x2d3a4a);
+        playerGraphics.fillRect(14, 40, 8, 14);
+        playerGraphics.fillRect(26, 40, 8, 14);
+        playerGraphics.fillStyle(0x232d3a);
+        playerGraphics.fillRect(15, 42, 2, 10);
+        playerGraphics.fillRect(27, 42, 2, 10);
+
+        // 도포
+        playerGraphics.fillStyle(0x3498db);
+        playerGraphics.fillRoundedRect(8, 20, 32, 24, 4);
+        playerGraphics.fillStyle(0x2980b9);
+        playerGraphics.fillRoundedRect(8, 20, 10, 24, 4);
+        playerGraphics.fillStyle(0x5dade2);
+        playerGraphics.fillRoundedRect(30, 22, 8, 18, 2);
+
+        // 허리띠
+        playerGraphics.fillStyle(0xf39c12);
+        playerGraphics.fillRect(8, 38, 32, 4);
+        playerGraphics.fillStyle(0xe67e22);
+        playerGraphics.fillRect(8, 40, 32, 2);
+        playerGraphics.fillStyle(0xf1c40f);
+        playerGraphics.fillCircle(24, 40, 4);
+        playerGraphics.fillStyle(0xe67e22);
+        playerGraphics.fillCircle(24, 40, 2);
+
+        // 소매
+        playerGraphics.fillStyle(0x3498db);
+        playerGraphics.fillEllipse(6, 28, 10, 14);
+        playerGraphics.fillEllipse(42, 28, 10, 14);
+        playerGraphics.fillStyle(0x5dade2);
+        playerGraphics.fillEllipse(8, 26, 6, 8);
+        playerGraphics.fillEllipse(40, 26, 6, 8);
+
+        // 손
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillCircle(4, 34, 4);
+        playerGraphics.fillCircle(44, 34, 4);
+        playerGraphics.fillStyle(0xf5cba7);
+        playerGraphics.fillCircle(3, 33, 2);
+        playerGraphics.fillCircle(43, 33, 2);
+
+        // 목
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillRect(20, 14, 8, 8);
+
+        // 얼굴
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillRoundedRect(14, 2, 20, 18, 6);
+        playerGraphics.fillStyle(0xf5cba7);
+        playerGraphics.fillRoundedRect(14, 10, 20, 8, 4);
+
+        // 머리카락
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRoundedRect(12, 0, 24, 10, 4);
+        playerGraphics.fillStyle(0x2c2c3e);
+        playerGraphics.fillEllipse(24, -2, 12, 8);
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillEllipse(24, -4, 8, 6);
+        playerGraphics.fillStyle(0x3d3d5c);
+        playerGraphics.fillRect(16, 2, 2, 4);
+
+        // 눈
+        playerGraphics.fillStyle(0xffffff);
+        playerGraphics.fillEllipse(18, 8, 5, 4);
+        playerGraphics.fillEllipse(30, 8, 5, 4);
+        playerGraphics.fillStyle(0x2c2c3e);
+        playerGraphics.fillCircle(19, 8, 2);
+        playerGraphics.fillCircle(31, 8, 2);
+        playerGraphics.fillStyle(0xffffff);
+        playerGraphics.fillCircle(20, 7, 1);
+        playerGraphics.fillCircle(32, 7, 1);
+
+        // 눈썹
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRect(16, 4, 6, 1);
+        playerGraphics.fillRect(28, 4, 6, 1);
+
+        // 입
+        playerGraphics.fillStyle(0xc0392b);
+        playerGraphics.fillRect(22, 14, 4, 1);
+
+        // 볼터치
+        playerGraphics.fillStyle(0xf1948a, 0.5);
+        playerGraphics.fillCircle(16, 12, 2);
+        playerGraphics.fillCircle(32, 12, 2);
+
+        playerGraphics.generateTexture('player', 48, 64);
+        playerGraphics.destroy();
+
+        // NPC 텍스처들
+        this.createNPCTexture('npc_blacksmith', 0x8B4513, 0xDC143C);
+        this.createNPCTexture('npc_innkeeper', 0xDAA520, 0x8B0000);
+        this.createNPCTexture('npc_alchemist', 0x9932CC, 0x4B0082);
+        this.createNPCTexture('npc_sage', 0x4169E1, 0x000080);
+        this.createNPCTexture('npc_merchant', 0x228B22, 0x006400);
+
+        // 몬스터 텍스처들
+        this.createMonsterTexture('monster_slime', 0x00ff00, 'slime');
+        this.createMonsterTexture('monster_bat', 0x8B4513, 'bat');
+        this.createMonsterTexture('monster_wolf', 0x808080, 'wolf');
+        this.createMonsterTexture('monster_ghost', 0xE8E8E8, 'ghost');
+        this.createMonsterTexture('monster_goblin', 0x90EE90, 'goblin');
+        this.createMonsterTexture('monster_orc', 0x556B2F, 'orc');
+        this.createMonsterTexture('monster_skeleton', 0xFFFACD, 'skeleton');
+        this.createMonsterTexture('monster_demon', 0x8B0000, 'demon');
+        this.createMonsterTexture('monster_dragon', 0xFF4500, 'dragon');
+        this.createMonsterTexture('monster_boss', 0x4B0082, 'boss');
+
+        // 아이템 텍스처
+        this.createItemTexture('item_gold', 0xFFD700);
+        this.createItemTexture('item_potion', 0xFF0000);
+        this.createItemTexture('item_weapon', 0xC0C0C0);
+
+        // 이펙트 텍스처
+        this.createEffectTexture('effect_slash', 0xFFFFFF);
+        this.createEffectTexture('effect_fire', 0xFF4500);
+        this.createEffectTexture('effect_heal', 0x00FF00);
+        this.createEffectTexture('effect_thunder', 0xFFFF00);
+        this.createEffectTexture('effect_ice', 0x00FFFF);
+
+        // 타일 텍스처
+        this.createTileTexture('tile_grass', 0x228B22, 0x32CD32);
+        this.createTileTexture('tile_stone', 0x696969, 0x808080);
+        this.createTileTexture('tile_dungeon', 0x2F2F2F, 0x3D3D3D);
+
+        // 울타리 텍스처
+        this.createFenceTexture();
+    }
+
+    createNPCTexture(key: string, bodyColor: number, accentColor: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        graphics.fillStyle(0x000000, 0.3);
+        graphics.fillEllipse(24, 60, 32, 12);
+
+        graphics.fillStyle(0x1a1a2e);
+        graphics.fillRoundedRect(12, 52, 10, 8, 2);
+        graphics.fillRoundedRect(26, 52, 10, 8, 2);
+
+        graphics.fillStyle(0x2d3a4a);
+        graphics.fillRect(14, 40, 8, 14);
+        graphics.fillRect(26, 40, 8, 14);
+
+        graphics.fillStyle(bodyColor);
+        graphics.fillRoundedRect(8, 20, 32, 24, 4);
+
+        graphics.fillStyle(accentColor);
+        graphics.fillRect(14, 28, 20, 14);
+
+        graphics.fillStyle(0xf39c12);
+        graphics.fillRect(8, 38, 32, 4);
+
+        graphics.fillStyle(bodyColor);
+        graphics.fillEllipse(6, 28, 10, 14);
+        graphics.fillEllipse(42, 28, 10, 14);
+
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillCircle(4, 34, 4);
+        graphics.fillCircle(44, 34, 4);
+
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillRect(20, 14, 8, 8);
+
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillRoundedRect(14, 2, 20, 18, 6);
+
+        graphics.fillStyle(0x1a1a2e);
+        graphics.fillRoundedRect(12, 0, 24, 8, 4);
+
+        graphics.fillStyle(0x2c2c3e);
+        graphics.fillCircle(19, 8, 2);
+        graphics.fillCircle(31, 8, 2);
+
+        graphics.fillStyle(0xc0392b);
+        graphics.fillRect(22, 14, 4, 1);
+
+        graphics.generateTexture(key, 48, 64);
+        graphics.destroy();
+    }
+
+    createMonsterTexture(key: string, color: number, type: string) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+        const size = 40;
+
+        graphics.fillStyle(0x000000, 0.4);
+        graphics.fillEllipse(size / 2, size - 4, size * 0.8, 8);
+
+        switch (type) {
+            case 'slime':
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, size * 0.8, size * 0.6);
+                graphics.fillStyle(0xffffff, 0.6);
+                graphics.fillEllipse(size / 2 - 6, size / 2 - 2, 8, 6);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 5, size / 2 + 2, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 + 2, 3);
+                graphics.fillStyle(0xffffff);
+                graphics.fillCircle(size / 2 - 4, size / 2 + 1, 1);
+                graphics.fillCircle(size / 2 + 6, size / 2 + 1, 1);
+                break;
+
+            case 'bat':
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2, 16, 12);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillTriangle(size / 2 - 8, size / 2, 2, size / 2 - 10, 2, size / 2 + 6);
+                graphics.fillTriangle(size / 2 + 8, size / 2, size - 2, size / 2 - 10, size - 2, size / 2 + 6);
+                graphics.fillStyle(color);
+                graphics.fillTriangle(size / 2 - 6, size / 2 - 6, size / 2 - 10, size / 2 - 14, size / 2 - 2, size / 2 - 6);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 6, size / 2 + 10, size / 2 - 14, size / 2 + 2, size / 2 - 6);
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 4, size / 2, 2);
+                graphics.fillCircle(size / 2 + 4, size / 2, 2);
+                break;
+
+            case 'wolf':
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, 28, 18);
+                graphics.fillCircle(size / 2 + 10, size / 2 - 2, 10);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).lighten(20).color);
+                graphics.fillEllipse(size / 2 + 16, size / 2, 8, 5);
+                graphics.fillStyle(color);
+                graphics.fillTriangle(size / 2 + 4, size / 2 - 8, size / 2 + 8, size / 2 - 16, size / 2 + 12, size / 2 - 8);
+                graphics.fillTriangle(size / 2 + 10, size / 2 - 8, size / 2 + 14, size / 2 - 16, size / 2 + 18, size / 2 - 8);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 8, size / 2 - 4, 2);
+                graphics.fillEllipse(size / 2 - 14, size / 2 - 2, 10, 6);
+                break;
+
+            case 'ghost':
+                graphics.fillStyle(color, 0.8);
+                graphics.fillEllipse(size / 2, size / 2 - 2, 24, 20);
+                graphics.fillTriangle(size / 2 - 12, size / 2 + 6, size / 2 - 6, size + 2, size / 2, size / 2 + 6);
+                graphics.fillTriangle(size / 2, size / 2 + 6, size / 2 + 6, size + 2, size / 2 + 12, size / 2 + 6);
+                graphics.fillStyle(0x000000);
+                graphics.fillEllipse(size / 2 - 5, size / 2 - 2, 6, 8);
+                graphics.fillEllipse(size / 2 + 5, size / 2 - 2, 6, 8);
+                graphics.fillEllipse(size / 2, size / 2 + 6, 8, 4);
+                break;
+
+            case 'goblin':
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 10, size / 2 - 4, 20, 20, 4);
+                graphics.fillCircle(size / 2, size / 2 - 8, 12);
+                graphics.fillTriangle(size / 2 - 12, size / 2 - 8, size / 2 - 18, size / 2 - 16, size / 2 - 8, size / 2 - 12);
+                graphics.fillTriangle(size / 2 + 12, size / 2 - 8, size / 2 + 18, size / 2 - 16, size / 2 + 8, size / 2 - 12);
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 1);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 1);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillCircle(size / 2, size / 2 - 6, 3);
+                break;
+
+            case 'orc':
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 14, size / 2 - 2, 28, 22, 4);
+                graphics.fillCircle(size / 2, size / 2 - 10, 14);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(10).color);
+                graphics.fillRect(size / 2 - 8, size / 2 - 4, 16, 6);
+                graphics.fillStyle(0xffffff);
+                graphics.fillTriangle(size / 2 - 6, size / 2 - 4, size / 2 - 4, size / 2 + 2, size / 2 - 2, size / 2 - 4);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 4, size / 2 + 4, size / 2 + 2, size / 2 + 2, size / 2 - 4);
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 12, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 12, 3);
+                break;
+
+            case 'skeleton':
+                graphics.fillStyle(color);
+                graphics.fillRect(size / 2 - 6, size / 2 - 4, 12, 18);
+                graphics.fillStyle(0x000000);
+                for (let i = 0; i < 4; i++) {
+                    graphics.fillRect(size / 2 - 5, size / 2 - 2 + i * 4, 10, 1);
+                }
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2 - 10, 10);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                graphics.fillTriangle(size / 2, size / 2 - 8, size / 2 - 2, size / 2 - 4, size / 2 + 2, size / 2 - 4);
+                graphics.fillRect(size / 2 - 5, size / 2 - 3, 10, 2);
+                break;
+
+            case 'demon':
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 12, size / 2 - 4, 24, 22, 4);
+                graphics.fillCircle(size / 2, size / 2 - 10, 12);
+                graphics.fillStyle(0x2c0000);
+                graphics.fillTriangle(size / 2 - 10, size / 2 - 14, size / 2 - 14, size / 2 - 26, size / 2 - 6, size / 2 - 14);
+                graphics.fillTriangle(size / 2 + 10, size / 2 - 14, size / 2 + 14, size / 2 - 26, size / 2 + 6, size / 2 - 14);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 1);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 1);
+                graphics.fillStyle(0x4a0000);
+                graphics.fillTriangle(size / 2 - 12, size / 2, 0, size / 2 - 14, 0, size / 2 + 8);
+                graphics.fillTriangle(size / 2 + 12, size / 2, size, size / 2 - 14, size, size / 2 + 8);
+                break;
+
+            case 'dragon':
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, 30, 20);
+                graphics.fillCircle(size / 2 + 12, size / 2 - 4, 12);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(10).color);
+                graphics.fillEllipse(size / 2 + 20, size / 2 - 2, 10, 6);
+                graphics.fillStyle(0xffd700);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 10, size / 2 + 4, size / 2 - 20, size / 2 + 10, size / 2 - 10);
+                graphics.fillTriangle(size / 2 + 14, size / 2 - 10, size / 2 + 12, size / 2 - 20, size / 2 + 18, size / 2 - 10);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 14, size / 2 - 6, 3);
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillTriangle(size / 2 - 6, size / 2, size / 2 - 20, size / 2 - 20, size / 2 - 16, size / 2 + 8);
+                graphics.fillStyle(0xff4500);
+                graphics.fillCircle(size / 2 + 24, size / 2 - 2, 4);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 26, size / 2 - 2, 2);
+                break;
+
+            case 'boss':
+                graphics.fillStyle(0xffd700);
+                graphics.fillTriangle(size / 2 - 12, size / 2 - 20, size / 2 - 8, size / 2 - 28, size / 2 - 4, size / 2 - 20);
+                graphics.fillTriangle(size / 2, size / 2 - 20, size / 2, size / 2 - 32, size / 2, size / 2 - 20);
+                graphics.fillTriangle(size / 2 + 4, size / 2 - 20, size / 2 + 8, size / 2 - 28, size / 2 + 12, size / 2 - 20);
+                graphics.fillRect(size / 2 - 12, size / 2 - 20, 24, 6);
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2 - 8, 14);
+                graphics.fillRoundedRect(size / 2 - 14, size / 2 + 2, 28, 20, 4);
+                graphics.fillStyle(0x4a0082);
+                graphics.fillTriangle(size / 2 - 14, size / 2 + 4, size / 2 - 18, size / 2 + 24, size / 2 - 10, size / 2 + 20);
+                graphics.fillTriangle(size / 2 + 14, size / 2 + 4, size / 2 + 18, size / 2 + 24, size / 2 + 10, size / 2 + 20);
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 10, 4);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 10, 4);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 10, 2);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 10, 2);
+                break;
+
+            default:
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2, size / 2 - 2);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 4, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 4, 3);
+        }
+
+        graphics.generateTexture(key, size, size);
+        graphics.destroy();
+    }
+
+    createItemTexture(key: string, color: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        if (key === 'item_gold') {
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 16, 8);
+            graphics.fillStyle(color);
+            graphics.fillCircle(12, 12, 10);
+            graphics.fillStyle(0xffa500);
+            graphics.fillCircle(12, 12, 7);
+            graphics.fillStyle(color);
+            graphics.fillCircle(12, 12, 4);
+            graphics.fillStyle(0xffa500);
+            graphics.fillRect(10, 8, 4, 8);
+        } else if (key === 'item_potion') {
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 14, 6);
+            graphics.fillStyle(0x8B4513);
+            graphics.fillRect(8, 2, 8, 4);
+            graphics.fillStyle(color);
+            graphics.fillRoundedRect(6, 6, 12, 16, 4);
+            graphics.fillStyle(0xffffff, 0.4);
+            graphics.fillRect(8, 8, 3, 8);
+        } else {
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 10, 6);
+            graphics.fillStyle(color);
+            graphics.fillRect(10, 2, 4, 16);
+            graphics.fillStyle(0x8B4513);
+            graphics.fillRect(6, 16, 12, 4);
+            graphics.fillRect(10, 18, 4, 4);
+        }
+
+        graphics.generateTexture(key, 24, 24);
+        graphics.destroy();
+    }
+
+    createEffectTexture(key: string, color: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        if (key === 'effect_slash') {
+            graphics.fillStyle(color, 0.8);
+            graphics.fillTriangle(0, 16, 32, 0, 32, 32);
+            graphics.fillStyle(0xffffff, 0.6);
+            graphics.fillTriangle(4, 16, 28, 4, 28, 28);
+        } else if (key === 'effect_fire') {
+            graphics.fillStyle(color);
+            graphics.fillCircle(16, 20, 12);
+            graphics.fillStyle(0xffff00);
+            graphics.fillCircle(16, 18, 8);
+            graphics.fillStyle(0xffffff);
+            graphics.fillCircle(16, 16, 4);
+            graphics.fillStyle(color);
+            graphics.fillTriangle(16, 4, 8, 16, 24, 16);
+        } else if (key === 'effect_heal') {
+            graphics.fillStyle(color);
+            graphics.fillRect(12, 4, 8, 24);
+            graphics.fillRect(4, 12, 24, 8);
+            graphics.fillStyle(0xffffff, 0.5);
+            graphics.fillRect(14, 6, 4, 20);
+            graphics.fillRect(6, 14, 20, 4);
+        } else if (key === 'effect_thunder') {
+            graphics.fillStyle(color);
+            graphics.fillTriangle(16, 0, 8, 16, 20, 14);
+            graphics.fillTriangle(12, 12, 4, 32, 24, 18);
+            graphics.fillStyle(0xffffff, 0.7);
+            graphics.fillTriangle(14, 4, 10, 14, 18, 12);
+        } else if (key === 'effect_ice') {
+            graphics.fillStyle(color);
+            graphics.fillRect(14, 2, 4, 28);
+            graphics.fillRect(2, 14, 28, 4);
+            graphics.fillRect(6, 6, 20, 20);
+            graphics.fillStyle(0xffffff);
+            graphics.fillCircle(16, 16, 6);
+        }
+
+        graphics.generateTexture(key, 32, 32);
+        graphics.destroy();
+    }
+
+    createTileTexture(key: string, color1: number, color2: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        graphics.fillStyle(color1);
+        graphics.fillRect(0, 0, 64, 64);
+
+        graphics.fillStyle(color2);
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if ((i + j) % 2 === 0) {
+                    graphics.fillRect(i * 8, j * 8, 8, 8);
+                }
+            }
+        }
+
+        graphics.lineStyle(1, Phaser.Display.Color.ValueToColor(color1).darken(30).color, 0.3);
+        graphics.strokeRect(0, 0, 64, 64);
+
+        graphics.generateTexture(key, 64, 64);
+        graphics.destroy();
+    }
+
+    createFenceTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        // 나무 울타리 기둥
+        graphics.fillStyle(0x8B4513);
+        graphics.fillRect(0, 0, 16, 64);
+        graphics.fillRect(48, 0, 16, 64);
+
+        // 가로 막대
+        graphics.fillStyle(0xA0522D);
+        graphics.fillRect(0, 8, 64, 8);
+        graphics.fillRect(0, 32, 64, 8);
+        graphics.fillRect(0, 48, 64, 8);
+
+        // 하이라이트
+        graphics.fillStyle(0xCD853F, 0.5);
+        graphics.fillRect(2, 0, 4, 64);
+        graphics.fillRect(50, 0, 4, 64);
+
+        graphics.generateTexture('fence', 64, 64);
+        graphics.destroy();
+
+        // 모서리 기둥
+        const cornerGraphics = this.make.graphics({ x: 0, y: 0 });
+        cornerGraphics.fillStyle(0x654321);
+        cornerGraphics.fillRect(0, 0, 32, 64);
+        cornerGraphics.fillStyle(0x8B4513);
+        cornerGraphics.fillRect(4, 0, 24, 60);
+        cornerGraphics.fillStyle(0xA0522D);
+        cornerGraphics.fillRect(8, 0, 16, 56);
+
+        cornerGraphics.generateTexture('fence_corner', 32, 64);
+        cornerGraphics.destroy();
+    }
+
+    create() {
+        this.scene.start('TownScene');
+    }
+}
+📁 src / game / scenes / TownScene.ts
+TypeScript
+
+import Phaser from 'phaser';
+import { GameEventBus } from '../GameEventBus';
+import { NPC_DATA } from '../data/npcs';
+
+interface PlayerStats {
+    hp: number;
+    maxHp: number;
+    mp: number;
+    maxMp: number;
+    level: number;
+    exp: number;
+    expToNext: number;
+    gold: number;
+    attack: number;
+    defense: number;
+}
+
+export class TownScene extends Phaser.Scene {
+    private player!: Phaser.Physics.Arcade.Sprite;
+    private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+    private npcs: Phaser.Physics.Arcade.Sprite[] = [];
+    private playerStats: PlayerStats = {
+        hp: 100,
+        maxHp: 100,
+        mp: 50,
+        maxMp: 50,
+        level: 1,
+        exp: 0,
+        expToNext: 100,
+        gold: 1000,
+        attack: 10,
+        defense: 5,
+    };
+    private nearbyNPC: Phaser.Physics.Arcade.Sprite | null = null;
+    private interactionText!: Phaser.GameObjects.Text;
+    private dialogueBox: Phaser.GameObjects.Container | null = null;
+
+    constructor() {
+        super({ key: 'TownScene' });
+    }
+
+    create() {
+        this.physics.world.setBounds(0, 0, 2400, 1800);
+
+        // 배경 타일
+        for (let x = 0; x < 2400; x += 64) {
+            for (let y = 0; y < 1800; y += 64) {
+                this.add.image(x + 32, y + 32, 'tile_grass');
+            }
+        }
+
+        // 마을 중앙 광장
+        for (let x = 800; x < 1600; x += 64) {
+            for (let y = 600; y < 1200; y += 64) {
+                this.add.image(x + 32, y + 32, 'tile_stone');
+            }
+        }
+
+        // 플레이어 생성
+        this.player = this.physics.add.sprite(1200, 900, 'player');
+        this.player.setCollideWorldBounds(true);
+        this.player.setDepth(10);
+        this.player.setScale(1.5);
+
+        // 카메라 설정
+        this.cameras.main.setBounds(0, 0, 2400, 1800);
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(1);
+
+        // NPC 생성
+        this.createNPCs();
+
+        // 입력 설정
+        this.cursors = this.input.keyboard!.createCursorKeys();
+        this.setupInput();
+
+        // 상호작용 텍스트
+        this.interactionText = this.add.text(0, 0, '', {
+            fontSize: '16px',
+            color: '#ffffff',
+            backgroundColor: '#000000',
+            padding: { x: 8, y: 4 },
+        });
+        this.interactionText.setDepth(100);
+        this.interactionText.setVisible(false);
+
+        // 마을 이름 표시
+        const townTitle = this.add.text(1200, 100, '⚔️ 바람의 마을 ⚔️', {
+
+            지금 마지막 수정해준 게임 코드를 전체 복사할 수 있게 제공해줘
+
+claude- opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+Built the project
+
+
+Show More
+
+
+
+업데이트된 게임을 실행시켜줘
+
+        claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+먼저 현재 파일들을 확인하겠습니다.
+
+
+            Listed 36 files
+
+
+
+
+
+
+
+Show More
+
+
+
+            - 레벨업 축하 메세지는 중앙에 크게 화면을 가리지 말고 우측하단에 알림으로 나오게 해줘
+                - 초반의 재미를 위해 30레벨까지는 성장이 쉽게 만들어줘
+                    - 아이템창이나 다른 창이 열려있을때는 esc 버튼이 "뒤로가기" 역할과 "창 종료"역할을 하게해줘
+                        - 내가 사용하지 않는 획득 아이템은 팔아서 재화로 변경할 수 있게 해줘
+                            - 스스로 학습해서 업데이트할 수 있는 유용한 기능들을 추가해줘
+                                - 내가 밖으로 이동하지 못하는 지역은 몬스터도 나가지 못하게하고 울타리를 쳐줘
+                                    - 스스로 학습해서 맵디자인, 캐릭터디자인, 인벤토리 등 업데이트할 수 있다면 업데이트해줘
+
+        claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+Built the project
+
+
+
+Show More
+
+
+
+게임을 한번 실행시켜줘
+
+        claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 2 seconds
+
+현재 프로젝트를 분석하고 유용한 기능들을 추가하겠습니다.먼저 파일들을 확인합니다.
+
+
+            Listed 28 files
+
+
+
+
+
+
+
+
+Show More
+
+
+
+게임 코드를 분석해서 스스로 학습하고 유용한 기능들을 업데이트해줘
+
+        claude - opus - 4 - 5 - 20251101
+        네, 전체 코드를 여기에 텍스트로 제공하겠습니다.모든 파일을 한번에 복사할 수 있도록 정리합니다.
+
+📦 전체 프로젝트 코드
+        1. index.html
+        HTML
+
+            < !DOCTYPE html >
+                <html lang="ko" >
+                    <head>
+                    <meta charset="UTF-8" />
+                        <link rel="icon" type = "image/svg+xml" href = "/vite.svg" />
+                            <meta name="viewport" content = "width=device-width, initial-scale=1.0" />
+                                <title>바람의 나라 - 클래식 RPG </title>
+                                    <style>
+                                    * {
+                                    margin: 0;
+                                    padding: 0;
+                                    box- sizing: border - box;
+    }
+      body {
+    overflow: hidden;
+    background - color: #000;
+}
+</style>
+    </head>
+    < body >
+    <div id="root" > </div>
+        < script type = "module" src = "/src/main.tsx" > </script>
+            </body>
+            </html>
+2. src / main.tsx
+React
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+    <App />
+    </StrictMode>,
+)
+3. src / App.tsx
+React
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import Phaser from 'phaser';
+import { gameConfig } from './game/GameConfig';
+import { GameEventBus } from './game/GameEventBus';
+import HUD from './components/UI/HUD';
+import Inventory from './components/UI/Inventory';
+import DungeonSelector from './components/UI/DungeonSelector';
+import SkillBar from './components/UI/SkillBar';
+import QuestPanel from './components/UI/QuestPanel';
+import CodeViewer from './components/UI/CodeViewer';
+
+// 타입 정의
+interface PlayerStats {
+    hp: number;
+    maxHp: number;
+    mp: number;
+    maxMp: number;
+    level: number;
+    exp: number;
+    expToNext: number;
+    gold: number;
+    attack: number;
+    defense: number;
+}
+
+interface InventoryItem {
+    id: string;
+    name: string;
+    type: 'weapon' | 'armor' | 'consumable' | 'material' | 'skillbook';
+    icon: string;
+    quantity: number;
+    description: string;
+    price: number;
+    effect?: {
+        hp?: number;
+        mp?: number;
+        attack?: number;
+        defense?: number;
+    };
+    requiredLevel?: number;
+}
+
+interface Skill {
+    id: string;
+    name: string;
+    icon: string;
+    damage: number;
+    mpCost: number;
+    cooldown: number;
+    currentCooldown: number;
+    requiredLevel: number;
+    description: string;
+}
+
+interface QuickSlot {
+    slot: number;
+    item: InventoryItem | null;
+}
+
+interface ActiveBuff {
+    id: string;
+    name: string;
+    icon: string;
+    duration: number;
+    remainingTime: number;
+    effect: {
+        attack?: number;
+        defense?: number;
+        speed?: number;
+    };
+}
+
+interface Quest {
+    id: string;
+    title: string;
+    description: string;
+    type: 'daily' | 'main' | 'side';
+    objectives: {
+        type: string;
+        target: string;
+        current: number;
+        required: number;
+    }[];
+    rewards: {
+        exp?: number;
+        gold?: number;
+        items?: { id: string; quantity: number }[];
+    };
+    completed: boolean;
+    claimed: boolean;
+}
+
+interface CombatStats {
+    totalDamage: number;
+    killCount: number;
+    critCount: number;
+    hitCount: number;
+    startTime: number;
+    dps: number;
+}
+
+interface MinimapData {
+    playerX: number;
+    playerY: number;
+    worldWidth: number;
+    worldHeight: number;
+    monsters: { x: number; y: number; isBoss: boolean }[];
+}
+
+function App() {
+    const gameRef = useRef<Phaser.Game | null>(null);
+    const [currentScene, setCurrentScene] = useState<string>('boot');
+    const [playerStats, setPlayerStats] = useState<PlayerStats>({
+        hp: 100,
+        maxHp: 100,
+        mp: 50,
+        maxMp: 50,
+        level: 1,
+        exp: 0,
+        expToNext: 100,
+        gold: 1000,
+        attack: 10,
+        defense: 5,
+    });
+    const [inventory, setInventory] = useState<InventoryItem[]>([
+        {
+            id: 'hp_potion_1',
+            name: '동동주',
+            type: 'consumable',
+            icon: '🍶',
+            quantity: 10,
+            description: 'HP를 50 회복합니다.',
+            price: 50,
+            effect: { hp: 50 },
+        },
+        {
+            id: 'mp_potion_1',
+            name: '마력 물약',
+            type: 'consumable',
+            icon: '💧',
+            quantity: 5,
+            description: 'MP를 30 회복합니다.',
+            price: 80,
+            effect: { mp: 30 },
+        },
+    ]);
+    const [skills, setSkills] = useState<Skill[]>([
+        {
+            id: 'slash',
+            name: '참격',
+            icon: '⚔️',
+            damage: 25,
+            mpCost: 5,
+            cooldown: 1000,
+            currentCooldown: 0,
+            requiredLevel: 1,
+            description: '기본 검술 공격',
+        },
+        {
+            id: 'fireball',
+            name: '화염구',
+            icon: '🔥',
+            damage: 50,
+            mpCost: 15,
+            cooldown: 3000,
+            currentCooldown: 0,
+            requiredLevel: 5,
+            description: '강력한 화염 마법',
+        },
+        {
+            id: 'heal',
+            name: '치유',
+            icon: '💚',
+            damage: 0,
+            mpCost: 20,
+            cooldown: 5000,
+            currentCooldown: 0,
+            requiredLevel: 3,
+            description: 'HP를 30 회복',
+        },
+        {
+            id: 'thunder',
+            name: '낙뢰',
+            icon: '⚡',
+            damage: 80,
+            mpCost: 25,
+            cooldown: 4000,
+            currentCooldown: 0,
+            requiredLevel: 10,
+            description: '번개를 소환하여 공격',
+        },
+        {
+            id: 'ice_storm',
+            name: '빙풍',
+            icon: '❄️',
+            damage: 60,
+            mpCost: 20,
+            cooldown: 3500,
+            currentCooldown: 0,
+            requiredLevel: 8,
+            description: '얼음 폭풍으로 범위 공격',
+        },
+        {
+            id: 'battle_cry',
+            name: '전투함성',
+            icon: '📯',
+            damage: 0,
+            mpCost: 30,
+            cooldown: 10000,
+            currentCooldown: 0,
+            requiredLevel: 15,
+            description: '10초간 공격력 50% 증가',
+        },
+    ]);
+    const [quickSlots, setQuickSlots] = useState<QuickSlot[]>([
+        { slot: 0, item: null },
+        { slot: 1, item: null },
+        { slot: 2, item: null },
+        { slot: 3, item: null },
+        { slot: 4, item: null },
+    ]);
+    const [showInventory, setShowInventory] = useState(false);
+    const [showDungeonSelector, setShowDungeonSelector] = useState(false);
+    const [showSkillBar, setShowSkillBar] = useState(false);
+    const [showQuestPanel, setShowQuestPanel] = useState(false);
+    const [showCodeViewer, setShowCodeViewer] = useState(false);
+    const [activeBuffs, setActiveBuffs] = useState<ActiveBuff[]>([]);
+    const [isAutoAttack, setIsAutoAttack] = useState(false);
+    const [combatStats, setCombatStats] = useState<CombatStats>({
+        totalDamage: 0,
+        killCount: 0,
+        critCount: 0,
+        hitCount: 0,
+        startTime: Date.now(),
+        dps: 0,
+    });
+    const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
+    const [quests, setQuests] = useState<Quest[]>([
+        {
+            id: 'daily_kill_50',
+            title: '몬스터 사냥꾼',
+            description: '몬스터 50마리를 처치하세요',
+            type: 'daily',
+            objectives: [{ type: 'kill', target: 'any', current: 0, required: 50 }],
+            rewards: { exp: 500, gold: 200 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'daily_kill_200',
+            title: '학살자',
+            description: '몬스터 200마리를 처치하세요',
+            type: 'daily',
+            objectives: [{ type: 'kill', target: 'any', current: 0, required: 200 }],
+            rewards: { exp: 2000, gold: 1000 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'daily_gold',
+            title: '골드 수집가',
+            description: '골드를 1000 획득하세요',
+            type: 'daily',
+            objectives: [{ type: 'collect', target: 'gold', current: 0, required: 1000 }],
+            rewards: { exp: 300, gold: 500 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'main_level_10',
+            title: '성장의 시작',
+            description: '레벨 10에 도달하세요',
+            type: 'main',
+            objectives: [{ type: 'level', target: 'player', current: 1, required: 10 }],
+            rewards: { exp: 1000, gold: 500 },
+            completed: false,
+            claimed: false,
+        },
+        {
+            id: 'main_level_50',
+            title: '숙련자의 길',
+            description: '레벨 50에 도달하세요',
+            type: 'main',
+            objectives: [{ type: 'level', target: 'player', current: 1, required: 50 }],
+            rewards: { exp: 10000, gold: 5000 },
+            completed: false,
+            claimed: false,
+        },
+    ]);
+
+    // 게임 이벤트 핸들러
+    const handlePlayerUpdate = useCallback((stats: PlayerStats) => {
+        setPlayerStats(stats);
+        // 레벨 퀘스트 업데이트
+        setQuests(prev => prev.map(quest => {
+            if (quest.objectives[0].type === 'level') {
+                const newCurrent = stats.level;
+                const completed = newCurrent >= quest.objectives[0].required;
+                return {
+                    ...quest,
+                    objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                    completed,
+                };
+            }
+            return quest;
+        }));
+    }, []);
+
+    const handleAddItem = useCallback((item: InventoryItem) => {
+        setInventory((prev) => {
+            const existing = prev.find((i) => i.id === item.id);
+            if (existing) {
+                return prev.map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+                );
+            }
+            return [...prev, item];
+        });
+    }, []);
+
+    const handleGoldChange = useCallback((amount: number) => {
+        setPlayerStats((prev) => {
+            const newGold = prev.gold + amount;
+            // 골드 퀘스트 업데이트
+            if (amount > 0) {
+                setQuests(prevQuests => prevQuests.map(quest => {
+                    if (quest.objectives[0].type === 'collect' && quest.objectives[0].target === 'gold') {
+                        const newCurrent = Math.min(quest.objectives[0].current + amount, quest.objectives[0].required);
+                        return {
+                            ...quest,
+                            objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                            completed: newCurrent >= quest.objectives[0].required,
+                        };
+                    }
+                    return quest;
+                }));
+            }
+            return { ...prev, gold: newGold };
+        });
+    }, []);
+
+    const handleMonsterKilled = useCallback(() => {
+        setQuests(prev => prev.map(quest => {
+            if (quest.objectives[0].type === 'kill') {
+                const newCurrent = Math.min(quest.objectives[0].current + 1, quest.objectives[0].required);
+                return {
+                    ...quest,
+                    objectives: [{ ...quest.objectives[0], current: newCurrent }],
+                    completed: newCurrent >= quest.objectives[0].required,
+                };
+            }
+            return quest;
+        }));
+    }, []);
+
+    const handleCombatStatsUpdate = useCallback((stats: CombatStats) => {
+        setCombatStats(stats);
+    }, []);
+
+    const handleMinimapUpdate = useCallback((data: MinimapData) => {
+        setMinimapData(data);
+    }, []);
+
+    const handleAutoAttackToggle = useCallback((enabled: boolean) => {
+        setIsAutoAttack(enabled);
+    }, []);
+
+    const handleAddBuff = useCallback((buff: ActiveBuff) => {
+        setActiveBuffs(prev => {
+            const existing = prev.find(b => b.id === buff.id);
+            if (existing) {
+                return prev.map(b => b.id === buff.id ? buff : b);
+            }
+            return [...prev, buff];
+        });
+    }, []);
+
+    // 퀘스트 보상 수령
+    const handleClaimQuest = useCallback((questId: string) => {
+        const quest = quests.find(q => q.id === questId);
+        if (quest && quest.completed && !quest.claimed) {
+            // 보상 지급
+            if (quest.rewards.exp) {
+                setPlayerStats(prev => ({
+                    ...prev,
+                    exp: prev.exp + quest.rewards.exp!,
+                }));
+            }
+            if (quest.rewards.gold) {
+                setPlayerStats(prev => ({
+                    ...prev,
+                    gold: prev.gold + quest.rewards.gold!,
+                }));
+            }
+            // 퀘스트 완료 처리
+            setQuests(prev => prev.map(q =>
+                q.id === questId ? { ...q, claimed: true } : q
+            ));
+        }
+    }, [quests]);
+
+    // 쿨다운 업데이트
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setSkills((prev) =>
+                prev.map((skill) => ({
+                    ...skill,
+                    currentCooldown: Math.max(0, skill.currentCooldown - 100),
+                }))
+            );
+            // 버프 시간 업데이트
+            setActiveBuffs(prev =>
+                prev
+                    .map(buff => ({ ...buff, remainingTime: buff.remainingTime - 0.1 }))
+                    .filter(buff => buff.remainingTime > 0)
+            );
+        }, 100);
+        return () => clearInterval(interval);
+    }, []);
+
+    // 키보드 이벤트 핸들러
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // ESC 키 처리 - 열린 모달을 순서대로 닫음
+            if (e.key === 'Escape') {
+                if (showInventory) {
+                    setShowInventory(false);
+                    return;
+                }
+                if (showSkillBar) {
+                    setShowSkillBar(false);
+                    return;
+                }
+                if (showQuestPanel) {
+                    setShowQuestPanel(false);
+                    return;
+                }
+                if (showCodeViewer) {
+                    setShowCodeViewer(false);
+                    return;
+                }
+                // 던전 셀렉터 토글
+                setShowDungeonSelector(prev => !prev);
+                return;
+            }
+
+            if (e.key.toLowerCase() === 'i') {
+                setShowInventory((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'w' && !e.ctrlKey) {
+                setShowSkillBar((prev) => !prev);
+            }
+            if (e.key.toLowerCase() === 'j') {
+                setShowQuestPanel((prev) => !prev);
+            }
+
+            // 퀵슬롯 사용
+            const quickSlotKeys = ['q', 'e', 'r', 't', 'f'];
+            const keyIndex = quickSlotKeys.indexOf(e.key.toLowerCase());
+            if (keyIndex !== -1) {
+                const slot = quickSlots[keyIndex];
+                if (slot.item && slot.item.type === 'consumable') {
+                    useQuickSlotItem(keyIndex);
+                }
+            }
+
+            // 스킬 사용 (1-9)
+            const skillIndex = parseInt(e.key) - 1;
+            if (skillIndex >= 0 && skillIndex < skills.length) {
+                useSkill(skillIndex);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [quickSlots, skills, showInventory, showDungeonSelector, showSkillBar, showQuestPanel, showCodeViewer]);
+
+    // 스킬 사용
+    const useSkill = (index: number) => {
+        const skill = skills[index];
+        if (!skill) return;
+        if (skill.currentCooldown > 0) return;
+        if (playerStats.mp < skill.mpCost) return;
+        if (playerStats.level < skill.requiredLevel) return;
+
+        // MP 소모
+        setPlayerStats((prev) => ({
+            ...prev,
+            mp: prev.mp - skill.mpCost,
+        }));
+
+        // 쿨다운 시작
+        setSkills((prev) =>
+            prev.map((s, i) =>
+                i === index ? { ...s, currentCooldown: s.cooldown } : s
+            )
+        );
+
+        // 힐 스킬 처리
+        if (skill.id === 'heal') {
+            setPlayerStats((prev) => ({
+                ...prev,
+                hp: Math.min(prev.maxHp, prev.hp + 30),
+            }));
+        }
+
+        // 버프 스킬 처리
+        if (skill.id === 'battle_cry') {
+            const buff: ActiveBuff = {
+                id: 'battle_cry_buff',
+                name: '전투함성',
+                icon: '📯',
+                duration: 10,
+                remainingTime: 10,
+                effect: { attack: 50 },
+            };
+            handleAddBuff(buff);
+            GameEventBus.emit('ADD_BUFF', buff);
+        }
+
+        // 게임에 스킬 이벤트 전달
+        GameEventBus.emit('USE_SKILL', skill);
+    };
+
+    // 퀵슬롯 아이템 사용
+    const useQuickSlotItem = (slotIndex: number) => {
+        const slot = quickSlots[slotIndex];
+        if (!slot.item) return;
+
+        const item = slot.item;
+        if (item.effect) {
+            setPlayerStats((prev) => ({
+                ...prev,
+                hp: Math.min(prev.maxHp, prev.hp + (item.effect?.hp || 0)),
+                mp: Math.min(prev.maxMp, prev.mp + (item.effect?.mp || 0)),
+            }));
+        }
+
+        // 인벤토리에서 수량 감소
+        setInventory((prev) =>
+            prev
+                .map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                )
+                .filter((i) => i.quantity > 0)
+        );
+
+        // 퀵슬롯 업데이트
+        setQuickSlots((prev) =>
+            prev.map((s, i) => {
+                if (i === slotIndex) {
+                    const remainingItem = inventory.find(
+                        (inv) => inv.id === item.id && inv.quantity > 1
+                    );
+                    return { ...s, item: remainingItem || null };
+                }
+                return s;
+            })
+        );
+    };
+
+    // 퀵슬롯에 아이템 등록
+    const assignToQuickSlot = (slotIndex: number, item: InventoryItem) => {
+        setQuickSlots((prev) =>
+            prev.map((s, i) => (i === slotIndex ? { ...s, item } : s))
+        );
+    };
+
+    // 던전 선택
+    const handleSelectDungeon = (dungeonLevel: number) => {
+        setShowDungeonSelector(false);
+        setCombatStats({
+            totalDamage: 0,
+            killCount: 0,
+            critCount: 0,
+            hitCount: 0,
+            startTime: Date.now(),
+            dps: 0,
+        });
+        GameEventBus.emit('CHANGE_SCENE', {
+            scene: 'DungeonScene',
+            data: { dungeonLevel },
+        });
+        setCurrentScene('dungeon');
+    };
+
+    // 마을로 귀환
+    const handleReturnToTown = () => {
+        setShowDungeonSelector(false);
+        setMinimapData(null);
+        GameEventBus.emit('CHANGE_SCENE', { scene: 'TownScene' });
+        setCurrentScene('town');
+    };
+
+    // Phaser 게임 초기화
+    useEffect(() => {
+        if (gameRef.current) return;
+
+        gameRef.current = new Phaser.Game(gameConfig);
+
+        // 이벤트 리스너 등록
+        GameEventBus.on('PLAYER_UPDATE', handlePlayerUpdate);
+        GameEventBus.on('ADD_ITEM', handleAddItem);
+        GameEventBus.on('GOLD_CHANGE', handleGoldChange);
+        GameEventBus.on('MONSTER_KILLED', handleMonsterKilled);
+        GameEventBus.on('COMBAT_STATS_UPDATE', handleCombatStatsUpdate);
+        GameEventBus.on('MINIMAP_UPDATE', handleMinimapUpdate);
+        GameEventBus.on('AUTO_ATTACK_TOGGLE', handleAutoAttackToggle);
+        GameEventBus.on('ADD_BUFF', handleAddBuff);
+        GameEventBus.on('SCENE_CHANGED', (scene: string) => setCurrentScene(scene));
+        GameEventBus.on('TOGGLE_DUNGEON_MENU', () => setShowDungeonSelector(prev => !prev));
+        GameEventBus.on('TOGGLE_INVENTORY', () => setShowInventory(prev => !prev));
+        GameEventBus.on('TOGGLE_SKILL_MENU', () => setShowSkillBar(prev => !prev));
+        GameEventBus.on('TOGGLE_QUEST_PANEL', () => setShowQuestPanel(prev => !prev));
+
+        return () => {
+            GameEventBus.off('PLAYER_UPDATE', handlePlayerUpdate);
+            GameEventBus.off('ADD_ITEM', handleAddItem);
+            GameEventBus.off('GOLD_CHANGE', handleGoldChange);
+            GameEventBus.off('MONSTER_KILLED', handleMonsterKilled);
+            GameEventBus.off('COMBAT_STATS_UPDATE', handleCombatStatsUpdate);
+            GameEventBus.off('MINIMAP_UPDATE', handleMinimapUpdate);
+            GameEventBus.off('AUTO_ATTACK_TOGGLE', handleAutoAttackToggle);
+            GameEventBus.off('ADD_BUFF', handleAddBuff);
+            gameRef.current?.destroy(true);
+            gameRef.current = null;
+        };
+    }, [handlePlayerUpdate, handleAddItem, handleGoldChange, handleMonsterKilled, handleCombatStatsUpdate, handleMinimapUpdate, handleAutoAttackToggle, handleAddBuff]);
+
+    return (
+        <div className= "relative w-screen h-screen overflow-hidden bg-black" >
+        {/* Phaser 게임 컨테이너 */ }
+        < div id = "game-container" className = "absolute inset-0" />
+
+            {/* React UI 오버레이 */ }
+            < HUD
+    playerStats = { playerStats }
+    quickSlots = { quickSlots }
+    skills = { skills }
+    currentScene = { currentScene }
+    activeBuffs = { activeBuffs }
+    isAutoAttack = { isAutoAttack }
+    combatStats = { currentScene === 'dungeon' ? combatStats : undefined
+}
+minimapData = { currentScene === 'dungeon' ? minimapData : undefined}
+      />
+
+{/* 인벤토리 */ }
+{
+    showInventory && (
+        <Inventory
+          items={ inventory }
+    onClose = {() => setShowInventory(false)
+}
+onUseItem = {(item) => {
+    if (item.type === 'consumable' && item.effect) {
+        setPlayerStats((prev) => ({
+            ...prev,
+            hp: Math.min(prev.maxHp, prev.hp + (item.effect?.hp || 0)),
+            mp: Math.min(prev.maxMp, prev.mp + (item.effect?.mp || 0)),
+        }));
+        setInventory((prev) =>
+            prev
+                .map((i) =>
+                    i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                )
+                .filter((i) => i.quantity > 0)
+        );
+    }
+}}
+onAssignQuickSlot = { assignToQuickSlot }
+gold = { playerStats.gold }
+    />
+      )}
+
+{/* 스킬 바 */ }
+{
+    showSkillBar && (
+        <SkillBar
+          skills={ skills }
+    playerLevel = { playerStats.level }
+    playerMp = { playerStats.mp }
+    onClose = {() => setShowSkillBar(false)
+}
+onUseSkill = { useSkill }
+    />
+      )}
+
+{/* 던전 선택 */ }
+{
+    showDungeonSelector && (
+        <DungeonSelector
+          playerLevel={ playerStats.level }
+    onSelect = { handleSelectDungeon }
+    onClose = {() => setShowDungeonSelector(false)
+}
+onReturnToTown = { currentScene === 'dungeon' ? handleReturnToTown : undefined}
+        />
+      )}
+
+{/* 퀘스트 패널 */ }
+{
+    showQuestPanel && (
+        <QuestPanel
+          quests={ quests }
+    onClose = {() => setShowQuestPanel(false)
+}
+onClaimReward = { handleClaimQuest }
+    />
+      )}
+
+{/* 코드 뷰어 */ }
+{
+    showCodeViewer && (
+        <CodeViewer onClose={ () => setShowCodeViewer(false) } />
+      )
+}
+
+{/* 코드 보기 버튼 */ }
+<button
+        onClick={ () => setShowCodeViewer(true) }
+className = "absolute bottom-4 left-4 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg border border-gray-600 transition-colors z-50"
+    >
+        📋 코드 보기
+    </button>
+    </div>
+  );
+}
+
+export default App;
+4. src / game / GameConfig.ts
+TypeScript
+
+import Phaser from 'phaser';
+import { BootScene } from './scenes/BootScene';
+import { TownScene } from './scenes/TownScene';
+import { DungeonScene } from './scenes/DungeonScene';
+
+export const gameConfig: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    parent: 'game-container',
+    width: 1920,
+    height: 1080,
+    pixelArt: true,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { x: 0, y: 0 },
+            debug: false,
+        },
+    },
+    scene: [BootScene, TownScene, DungeonScene],
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
+};
+5. src / game / GameEventBus.ts
+TypeScript
+
+type EventCallback = (...args: unknown[]) => void;
+
+class EventBus {
+    private events: Map<string, EventCallback[]> = new Map();
+
+    on(event: string, callback: EventCallback) {
+        if (!this.events.has(event)) {
+            this.events.set(event, []);
+        }
+        this.events.get(event)!.push(callback);
+    }
+
+    off(event: string, callback: EventCallback) {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            const index = callbacks.indexOf(callback);
+            if (index > -1) {
+                callbacks.splice(index, 1);
+            }
+        }
+    }
+
+    emit(event: string, ...args: unknown[]) {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            callbacks.forEach((callback) => callback(...args));
+        }
+    }
+}
+
+export const GameEventBus = new EventBus();
+6. src / game / scenes / BootScene.ts
+TypeScript
+
+import Phaser from 'phaser';
+
+export class BootScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'BootScene' });
+    }
+
+    preload() {
+        // 로딩 바 표시
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+
+        const progressBar = this.add.graphics();
+        const progressBox = this.add.graphics();
+        progressBox.fillStyle(0x222222, 0.8);
+        progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
+
+        const loadingText = this.add.text(width / 2, height / 2 - 50, '로딩 중...', {
+            fontSize: '20px',
+            color: '#ffffff',
+        });
+        loadingText.setOrigin(0.5, 0.5);
+
+        this.load.on('progress', (value: number) => {
+            progressBar.clear();
+            progressBar.fillStyle(0x00ff00, 1);
+            progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+        });
+
+        this.load.on('complete', () => {
+            progressBar.destroy();
+            progressBox.destroy();
+            loadingText.destroy();
+        });
+
+        // 동적으로 텍스처 생성
+        this.createTextures();
+    }
+
+    createTextures() {
+        // 플레이어 캐릭터 (바람의 나라 스타일 - 더 입체적인 디자인)
+        const playerGraphics = this.make.graphics({ x: 0, y: 0 });
+
+        // 그림자
+        playerGraphics.fillStyle(0x000000, 0.3);
+        playerGraphics.fillEllipse(24, 60, 32, 12);
+
+        // 신발
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRoundedRect(12, 52, 10, 8, 2);
+        playerGraphics.fillRoundedRect(26, 52, 10, 8, 2);
+
+        // 다리 (바지)
+        playerGraphics.fillStyle(0x2d3a4a);
+        playerGraphics.fillRect(14, 40, 8, 14);
+        playerGraphics.fillRect(26, 40, 8, 14);
+        // 바지 주름
+        playerGraphics.fillStyle(0x232d3a);
+        playerGraphics.fillRect(15, 42, 2, 10);
+        playerGraphics.fillRect(27, 42, 2, 10);
+
+        // 도포 (한복 스타일 - 그라데이션 효과)
+        playerGraphics.fillStyle(0x3498db);
+        playerGraphics.fillRoundedRect(8, 20, 32, 24, 4);
+        // 도포 어두운 부분
+        playerGraphics.fillStyle(0x2980b9);
+        playerGraphics.fillRoundedRect(8, 20, 10, 24, 4);
+        // 도포 밝은 부분
+        playerGraphics.fillStyle(0x5dade2);
+        playerGraphics.fillRoundedRect(30, 22, 8, 18, 2);
+
+        // 허리띠 (금색)
+        playerGraphics.fillStyle(0xf39c12);
+        playerGraphics.fillRect(8, 38, 32, 4);
+        playerGraphics.fillStyle(0xe67e22);
+        playerGraphics.fillRect(8, 40, 32, 2);
+        // 허리띠 매듭
+        playerGraphics.fillStyle(0xf1c40f);
+        playerGraphics.fillCircle(24, 40, 4);
+        playerGraphics.fillStyle(0xe67e22);
+        playerGraphics.fillCircle(24, 40, 2);
+
+        // 소매 (넓은 한복 소매)
+        playerGraphics.fillStyle(0x3498db);
+        playerGraphics.fillEllipse(6, 28, 10, 14);
+        playerGraphics.fillEllipse(42, 28, 10, 14);
+        playerGraphics.fillStyle(0x5dade2);
+        playerGraphics.fillEllipse(8, 26, 6, 8);
+        playerGraphics.fillEllipse(40, 26, 6, 8);
+
+        // 손
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillCircle(4, 34, 4);
+        playerGraphics.fillCircle(44, 34, 4);
+        playerGraphics.fillStyle(0xf5cba7);
+        playerGraphics.fillCircle(3, 33, 2);
+        playerGraphics.fillCircle(43, 33, 2);
+
+        // 목
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillRect(20, 14, 8, 8);
+
+        // 얼굴 (더 디테일하게)
+        playerGraphics.fillStyle(0xfad7a0);
+        playerGraphics.fillRoundedRect(14, 2, 20, 18, 6);
+        // 얼굴 음영
+        playerGraphics.fillStyle(0xf5cba7);
+        playerGraphics.fillRoundedRect(14, 10, 20, 8, 4);
+
+        // 머리카락 (상투 스타일)
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRoundedRect(12, 0, 24, 10, 4);
+        // 상투
+        playerGraphics.fillStyle(0x2c2c3e);
+        playerGraphics.fillEllipse(24, -2, 12, 8);
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillEllipse(24, -4, 8, 6);
+        // 머리카락 하이라이트
+        playerGraphics.fillStyle(0x3d3d5c);
+        playerGraphics.fillRect(16, 2, 2, 4);
+
+        // 눈 (더 표현력 있게)
+        playerGraphics.fillStyle(0xffffff);
+        playerGraphics.fillEllipse(18, 8, 5, 4);
+        playerGraphics.fillEllipse(30, 8, 5, 4);
+        playerGraphics.fillStyle(0x2c2c3e);
+        playerGraphics.fillCircle(19, 8, 2);
+        playerGraphics.fillCircle(31, 8, 2);
+        // 눈 하이라이트
+        playerGraphics.fillStyle(0xffffff);
+        playerGraphics.fillCircle(20, 7, 1);
+        playerGraphics.fillCircle(32, 7, 1);
+
+        // 눈썹
+        playerGraphics.fillStyle(0x1a1a2e);
+        playerGraphics.fillRect(16, 4, 6, 1);
+        playerGraphics.fillRect(28, 4, 6, 1);
+
+        // 입
+        playerGraphics.fillStyle(0xc0392b);
+        playerGraphics.fillRect(22, 14, 4, 1);
+
+        // 볼 터치
+        playerGraphics.fillStyle(0xf1948a, 0.5);
+        playerGraphics.fillCircle(16, 12, 2);
+        playerGraphics.fillCircle(32, 12, 2);
+
+        playerGraphics.generateTexture('player', 48, 64);
+        playerGraphics.destroy();
+
+        // NPC 텍스처들 생성
+        this.createNPCTexture('npc_blacksmith', 0x8B4513, 0xDC143C, '🔨'); // 대장장이
+        this.createNPCTexture('npc_innkeeper', 0xDAA520, 0x8B0000, '🍺'); // 주모
+        this.createNPCTexture('npc_alchemist', 0x9932CC, 0x4B0082, '⚗️'); // 연금술사
+        this.createNPCTexture('npc_sage', 0x4169E1, 0x000080, '📖'); // 도사
+        this.createNPCTexture('npc_merchant', 0x228B22, 0x006400, '💰'); // 잡화상
+
+        // 몬스터 텍스처들 생성
+        this.createMonsterTexture('monster_slime', 0x00ff00, 'slime');
+        this.createMonsterTexture('monster_bat', 0x8B4513, 'bat');
+        this.createMonsterTexture('monster_wolf', 0x808080, 'wolf');
+        this.createMonsterTexture('monster_ghost', 0xE8E8E8, 'ghost');
+        this.createMonsterTexture('monster_goblin', 0x90EE90, 'goblin');
+        this.createMonsterTexture('monster_orc', 0x556B2F, 'orc');
+        this.createMonsterTexture('monster_skeleton', 0xFFFACD, 'skeleton');
+        this.createMonsterTexture('monster_demon', 0x8B0000, 'demon');
+        this.createMonsterTexture('monster_dragon', 0xFF4500, 'dragon');
+        this.createMonsterTexture('monster_boss', 0x4B0082, 'boss');
+
+        // 아이템 텍스처
+        this.createItemTexture('item_gold', 0xFFD700);
+        this.createItemTexture('item_potion', 0xFF0000);
+        this.createItemTexture('item_weapon', 0xC0C0C0);
+
+        // 이펙트 텍스처
+        this.createEffectTexture('effect_slash', 0xFFFFFF);
+        this.createEffectTexture('effect_fire', 0xFF4500);
+        this.createEffectTexture('effect_heal', 0x00FF00);
+        this.createEffectTexture('effect_thunder', 0xFFFF00);
+        this.createEffectTexture('effect_ice', 0x00FFFF);
+
+        // 타일 텍스처
+        this.createTileTexture('tile_grass', 0x228B22, 0x32CD32);
+        this.createTileTexture('tile_stone', 0x696969, 0x808080);
+        this.createTileTexture('tile_dungeon', 0x2F2F2F, 0x3D3D3D);
+    }
+
+    createNPCTexture(key: string, bodyColor: number, accentColor: number, _icon: string) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        // 그림자
+        graphics.fillStyle(0x000000, 0.3);
+        graphics.fillEllipse(24, 60, 32, 12);
+
+        // 신발
+        graphics.fillStyle(0x1a1a2e);
+        graphics.fillRoundedRect(12, 52, 10, 8, 2);
+        graphics.fillRoundedRect(26, 52, 10, 8, 2);
+
+        // 다리
+        graphics.fillStyle(0x2d3a4a);
+        graphics.fillRect(14, 40, 8, 14);
+        graphics.fillRect(26, 40, 8, 14);
+
+        // 몸체
+        graphics.fillStyle(bodyColor);
+        graphics.fillRoundedRect(8, 20, 32, 24, 4);
+
+        // 앞치마/액센트
+        graphics.fillStyle(accentColor);
+        graphics.fillRect(14, 28, 20, 14);
+
+        // 허리띠
+        graphics.fillStyle(0xf39c12);
+        graphics.fillRect(8, 38, 32, 4);
+
+        // 소매
+        graphics.fillStyle(bodyColor);
+        graphics.fillEllipse(6, 28, 10, 14);
+        graphics.fillEllipse(42, 28, 10, 14);
+
+        // 손
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillCircle(4, 34, 4);
+        graphics.fillCircle(44, 34, 4);
+
+        // 목
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillRect(20, 14, 8, 8);
+
+        // 얼굴
+        graphics.fillStyle(0xfad7a0);
+        graphics.fillRoundedRect(14, 2, 20, 18, 6);
+
+        // 머리카락/모자
+        graphics.fillStyle(0x1a1a2e);
+        graphics.fillRoundedRect(12, 0, 24, 8, 4);
+
+        // 눈
+        graphics.fillStyle(0x2c2c3e);
+        graphics.fillCircle(19, 8, 2);
+        graphics.fillCircle(31, 8, 2);
+
+        // 입
+        graphics.fillStyle(0xc0392b);
+        graphics.fillRect(22, 14, 4, 1);
+
+        graphics.generateTexture(key, 48, 64);
+        graphics.destroy();
+    }
+
+    createMonsterTexture(key: string, color: number, type: string) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+        const size = 40;
+
+        // 그림자
+        graphics.fillStyle(0x000000, 0.4);
+        graphics.fillEllipse(size / 2, size - 4, size * 0.8, 8);
+
+        switch (type) {
+            case 'slime':
+                // 슬라임 몸체
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, size * 0.8, size * 0.6);
+                // 하이라이트
+                graphics.fillStyle(0xffffff, 0.6);
+                graphics.fillEllipse(size / 2 - 6, size / 2 - 2, 8, 6);
+                // 눈
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 5, size / 2 + 2, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 + 2, 3);
+                graphics.fillStyle(0xffffff);
+                graphics.fillCircle(size / 2 - 4, size / 2 + 1, 1);
+                graphics.fillCircle(size / 2 + 6, size / 2 + 1, 1);
+                break;
+
+            case 'bat':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2, 16, 12);
+                // 날개
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillTriangle(size / 2 - 8, size / 2, 2, size / 2 - 10, 2, size / 2 + 6);
+                graphics.fillTriangle(size / 2 + 8, size / 2, size - 2, size / 2 - 10, size - 2, size / 2 + 6);
+                // 귀
+                graphics.fillStyle(color);
+                graphics.fillTriangle(size / 2 - 6, size / 2 - 6, size / 2 - 10, size / 2 - 14, size / 2 - 2, size / 2 - 6);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 6, size / 2 + 10, size / 2 - 14, size / 2 + 2, size / 2 - 6);
+                // 눈
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 4, size / 2, 2);
+                graphics.fillCircle(size / 2 + 4, size / 2, 2);
+                break;
+
+            case 'wolf':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, 28, 18);
+                // 머리
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2 + 10, size / 2 - 2, 10);
+                // 주둥이
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).lighten(20).color);
+                graphics.fillEllipse(size / 2 + 16, size / 2, 8, 5);
+                // 귀
+                graphics.fillStyle(color);
+                graphics.fillTriangle(size / 2 + 4, size / 2 - 8, size / 2 + 8, size / 2 - 16, size / 2 + 12, size / 2 - 8);
+                graphics.fillTriangle(size / 2 + 10, size / 2 - 8, size / 2 + 14, size / 2 - 16, size / 2 + 18, size / 2 - 8);
+                // 눈
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 8, size / 2 - 4, 2);
+                // 꼬리
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2 - 14, size / 2 - 2, 10, 6);
+                break;
+
+            case 'ghost':
+                // 몸체 (반투명 효과)
+                graphics.fillStyle(color, 0.8);
+                graphics.fillEllipse(size / 2, size / 2 - 2, 24, 20);
+                // 꼬리 부분 (물결 형태)
+                graphics.fillTriangle(size / 2 - 12, size / 2 + 6, size / 2 - 6, size + 2, size / 2, size / 2 + 6);
+                graphics.fillTriangle(size / 2, size / 2 + 6, size / 2 + 6, size + 2, size / 2 + 12, size / 2 + 6);
+                // 눈
+                graphics.fillStyle(0x000000);
+                graphics.fillEllipse(size / 2 - 5, size / 2 - 2, 6, 8);
+                graphics.fillEllipse(size / 2 + 5, size / 2 - 2, 6, 8);
+                // 입
+                graphics.fillEllipse(size / 2, size / 2 + 6, 8, 4);
+                break;
+
+            case 'goblin':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 10, size / 2 - 4, 20, 20, 4);
+                // 머리
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2 - 8, 12);
+                // 귀 (뾰족하게)
+                graphics.fillTriangle(size / 2 - 12, size / 2 - 8, size / 2 - 18, size / 2 - 16, size / 2 - 8, size / 2 - 12);
+                graphics.fillTriangle(size / 2 + 12, size / 2 - 8, size / 2 + 18, size / 2 - 16, size / 2 + 8, size / 2 - 12);
+                // 눈
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 1);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 1);
+                // 코
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillCircle(size / 2, size / 2 - 6, 3);
+                break;
+
+            case 'orc':
+                // 몸체 (근육질)
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 14, size / 2 - 2, 28, 22, 4);
+                // 머리
+                graphics.fillCircle(size / 2, size / 2 - 10, 14);
+                // 턱
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(10).color);
+                graphics.fillRect(size / 2 - 8, size / 2 - 4, 16, 6);
+                // 이빨
+                graphics.fillStyle(0xffffff);
+                graphics.fillTriangle(size / 2 - 6, size / 2 - 4, size / 2 - 4, size / 2 + 2, size / 2 - 2, size / 2 - 4);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 4, size / 2 + 4, size / 2 + 2, size / 2 + 2, size / 2 - 4);
+                // 눈
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 12, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 12, 3);
+                break;
+
+            case 'skeleton':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillRect(size / 2 - 6, size / 2 - 4, 12, 18);
+                // 갈비뼈
+                graphics.fillStyle(0x000000);
+                for (let i = 0; i < 4; i++) {
+                    graphics.fillRect(size / 2 - 5, size / 2 - 2 + i * 4, 10, 1);
+                }
+                // 머리 (해골)
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2 - 10, 10);
+                // 눈구멍
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                // 코
+                graphics.fillTriangle(size / 2, size / 2 - 8, size / 2 - 2, size / 2 - 4, size / 2 + 2, size / 2 - 4);
+                // 이빨
+                graphics.fillRect(size / 2 - 5, size / 2 - 3, 10, 2);
+                break;
+
+            case 'demon':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillRoundedRect(size / 2 - 12, size / 2 - 4, 24, 22, 4);
+                // 머리
+                graphics.fillCircle(size / 2, size / 2 - 10, 12);
+                // 뿔
+                graphics.fillStyle(0x2c0000);
+                graphics.fillTriangle(size / 2 - 10, size / 2 - 14, size / 2 - 14, size / 2 - 26, size / 2 - 6, size / 2 - 14);
+                graphics.fillTriangle(size / 2 + 10, size / 2 - 14, size / 2 + 14, size / 2 - 26, size / 2 + 6, size / 2 - 14);
+                // 눈
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 3);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 3);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 4, size / 2 - 10, 1);
+                graphics.fillCircle(size / 2 + 4, size / 2 - 10, 1);
+                // 날개
+                graphics.fillStyle(0x4a0000);
+                graphics.fillTriangle(size / 2 - 12, size / 2, 0, size / 2 - 14, 0, size / 2 + 8);
+                graphics.fillTriangle(size / 2 + 12, size / 2, size, size / 2 - 14, size, size / 2 + 8);
+                break;
+
+            case 'dragon':
+                // 몸체
+                graphics.fillStyle(color);
+                graphics.fillEllipse(size / 2, size / 2 + 4, 30, 20);
+                // 머리
+                graphics.fillCircle(size / 2 + 12, size / 2 - 4, 12);
+                // 주둥이
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(10).color);
+                graphics.fillEllipse(size / 2 + 20, size / 2 - 2, 10, 6);
+                // 뿔
+                graphics.fillStyle(0xffd700);
+                graphics.fillTriangle(size / 2 + 6, size / 2 - 10, size / 2 + 4, size / 2 - 20, size / 2 + 10, size / 2 - 10);
+                graphics.fillTriangle(size / 2 + 14, size / 2 - 10, size / 2 + 12, size / 2 - 20, size / 2 + 18, size / 2 - 10);
+                // 눈
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 14, size / 2 - 6, 3);
+                // 날개
+                graphics.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(20).color);
+                graphics.fillTriangle(size / 2 - 6, size / 2, size / 2 - 20, size / 2 - 20, size / 2 - 16, size / 2 + 8);
+                // 불꽃
+                graphics.fillStyle(0xff4500);
+                graphics.fillCircle(size / 2 + 24, size / 2 - 2, 4);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 + 26, size / 2 - 2, 2);
+                break;
+
+            case 'boss':
+                // 왕관
+                graphics.fillStyle(0xffd700);
+                graphics.fillTriangle(size / 2 - 12, size / 2 - 20, size / 2 - 8, size / 2 - 28, size / 2 - 4, size / 2 - 20);
+                graphics.fillTriangle(size / 2, size / 2 - 20, size / 2, size / 2 - 32, size / 2, size / 2 - 20);
+                graphics.fillTriangle(size / 2 + 4, size / 2 - 20, size / 2 + 8, size / 2 - 28, size / 2 + 12, size / 2 - 20);
+                graphics.fillRect(size / 2 - 12, size / 2 - 20, 24, 6);
+                // 머리
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2 - 8, 14);
+                // 몸체
+                graphics.fillRoundedRect(size / 2 - 14, size / 2 + 2, 28, 20, 4);
+                // 망토
+                graphics.fillStyle(0x4a0082);
+                graphics.fillTriangle(size / 2 - 14, size / 2 + 4, size / 2 - 18, size / 2 + 24, size / 2 - 10, size / 2 + 20);
+                graphics.fillTriangle(size / 2 + 14, size / 2 + 4, size / 2 + 18, size / 2 + 24, size / 2 + 10, size / 2 + 20);
+                // 눈 (붉은 빛)
+                graphics.fillStyle(0xff0000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 10, 4);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 10, 4);
+                graphics.fillStyle(0xffff00);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 10, 2);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 10, 2);
+                break;
+
+            default:
+                graphics.fillStyle(color);
+                graphics.fillCircle(size / 2, size / 2, size / 2 - 2);
+                graphics.fillStyle(0x000000);
+                graphics.fillCircle(size / 2 - 5, size / 2 - 4, 3);
+                graphics.fillCircle(size / 2 + 5, size / 2 - 4, 3);
+        }
+
+        graphics.generateTexture(key, size, size);
+        graphics.destroy();
+    }
+
+    createItemTexture(key: string, color: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        if (key === 'item_gold') {
+            // 금화
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 16, 8);
+            graphics.fillStyle(color);
+            graphics.fillCircle(12, 12, 10);
+            graphics.fillStyle(0xffa500);
+            graphics.fillCircle(12, 12, 7);
+            graphics.fillStyle(color);
+            graphics.fillCircle(12, 12, 4);
+            // $ 기호
+            graphics.fillStyle(0xffa500);
+            graphics.fillRect(10, 8, 4, 8);
+        } else if (key === 'item_potion') {
+            // 포션 병
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 14, 6);
+            graphics.fillStyle(0x8B4513);
+            graphics.fillRect(8, 2, 8, 4);
+            graphics.fillStyle(color);
+            graphics.fillRoundedRect(6, 6, 12, 16, 4);
+            graphics.fillStyle(0xffffff, 0.4);
+            graphics.fillRect(8, 8, 3, 8);
+        } else {
+            // 무기 (검)
+            graphics.fillStyle(0x000000, 0.3);
+            graphics.fillEllipse(12, 22, 10, 6);
+            graphics.fillStyle(color);
+            graphics.fillRect(10, 2, 4, 16);
+            graphics.fillStyle(0x8B4513);
+            graphics.fillRect(6, 16, 12, 4);
+            graphics.fillRect(10, 18, 4, 4);
+        }
+
+        graphics.generateTexture(key, 24, 24);
+        graphics.destroy();
+    }
+
+    createEffectTexture(key: string, color: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        if (key === 'effect_slash') {
+            graphics.fillStyle(color, 0.8);
+            graphics.fillTriangle(0, 16, 32, 0, 32, 32);
+            graphics.fillStyle(0xffffff, 0.6);
+            graphics.fillTriangle(4, 16, 28, 4, 28, 28);
+        } else if (key === 'effect_fire') {
+            graphics.fillStyle(color);
+            graphics.fillCircle(16, 20, 12);
+            graphics.fillStyle(0xffff00);
+            graphics.fillCircle(16, 18, 8);
+            graphics.fillStyle(0xffffff);
+            graphics.fillCircle(16, 16, 4);
+            // 불꽃 형태
+            graphics.fillStyle(color);
+            graphics.fillTriangle(16, 4, 8, 16, 24, 16);
+        } else if (key === 'effect_heal') {
+            // 십자가 + 하트
+            graphics.fillStyle(color);
+            graphics.fillRect(12, 4, 8, 24);
+            graphics.fillRect(4, 12, 24, 8);
+            graphics.fillStyle(0xffffff, 0.5);
+            graphics.fillRect(14, 6, 4, 20);
+            graphics.fillRect(6, 14, 20, 4);
+        } else if (key === 'effect_thunder') {
+            graphics.fillStyle(color);
+            graphics.fillTriangle(16, 0, 8, 16, 20, 14);
+            graphics.fillTriangle(12, 12, 4, 32, 24, 18);
+            graphics.fillStyle(0xffffff, 0.7);
+            graphics.fillTriangle(14, 4, 10, 14, 18, 12);
+        } else if (key === 'effect_ice') {
+            graphics.fillStyle(color);
+            // 눈송이 형태
+            graphics.fillRect(14, 2, 4, 28);
+            graphics.fillRect(2, 14, 28, 4);
+            graphics.fillRect(6, 6, 20, 20);
+            graphics.fillStyle(0xffffff);
+            graphics.fillCircle(16, 16, 6);
+        }
+
+        graphics.generateTexture(key, 32, 32);
+        graphics.destroy();
+    }
+
+    createTileTexture(key: string, color1: number, color2: number) {
+        const graphics = this.make.graphics({ x: 0, y: 0 });
+
+        graphics.fillStyle(color1);
+        graphics.fillRect(0, 0, 64, 64);
+
+        // 패턴 추가
+        graphics.fillStyle(color2);
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if ((i + j) % 2 === 0) {
+                    graphics.fillRect(i * 8, j * 8, 8, 8);
+                }
+            }
+        }
+
+        // 테두리/디테일
+        graphics.lineStyle(1, Phaser.Display.Color.ValueToColor(color1).darken(30).color, 0.3);
+        graphics.strokeRect(0, 0, 64, 64);
+
+        graphics.generateTexture(key, 64, 64);
+        graphics.destroy();
+    }
+
+    create() {
+        this.scene.start('TownScene');
+    }
+}
+7. src / game / scenes / TownScene.ts
+TypeScript
+
+import Phaser from 'phaser';
+import { GameEventBus } from '../GameEventBus';
+import { NPC_DATA } from '../data/npcs';
+
+interface PlayerStats {
+    hp: number;
+    maxHp: number;
+    mp: number;
+    maxMp: number;
+    level: number;
+    exp: number;
+    expToNext: number;
+    gold: number;
+    attack: number;
+    defense: number;
+}
+
+export class TownScene extends Phaser.Scene {
+    private player!: Phaser.Physics.Arcade.Sprite;
+    private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+    private npcs: Phaser.Physics.Arcade.Sprite[] = [];
+    private playerStats: PlayerStats = {
+        hp: 100,
+        maxHp: 100,
+        mp: 50,
+        maxMp: 50,
+        level: 1,
+        exp: 0,
+        expToNext: 100,
+        gold: 1000,
+        attack: 10,
+        defense: 5,
+    };
+    private nearbyNPC: Phaser.Physics.Arcade.Sprite | null = null;
+    private interactionText!: Phaser.GameObjects.Text;
+    private dialogueBox: Phaser.GameObjects.Container | null = null;
+
+    constructor() {
+        super({ key: 'TownScene' });
+    }
+
+    create() {
+        // 월드 크기 설정
+        this.physics.world.setBounds(0, 0, 2400, 1800);
+
+        // 배경 타일
+        for (let x = 0; x < 2400; x += 64) {
+            for (let y = 0; y < 1800; y += 64) {
+                this.add.image(x + 32, y + 32, 'tile_grass');
+            }
+        }
+
+        // 마을 중앙 광장 (돌 타일)
+        for (let x = 800; x < 1600; x += 64) {
+            for (let y = 600; y < 1200; y += 64) {
+                this.add.image(x + 32, y + 32, 'tile_stone');
+            }
+        }
+
+        // 플레이어 생성
+        this.player = this.physics.add.sprite(1200, 900, 'player');
+        this.player.setCollideWorldBounds(true);
+        this.player.setDepth(10);
+        this.player.setScale(1.5);
+
+        // 카메라 설정
+        this.cameras.main.setBounds(0, 0, 2400, 1800);
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.setZoom(1);
+
+        // NPC 생성
+        this.createNPCs();
+
+        // 입력 설정
+        this.cursors = this.input.keyboard!.createCursorKeys();
+        this.setupInput();
+
+        // 상호작용 텍스트
+        this.interactionText = this.add.text(0, 0, '', {
+            fontSize: '16px',
+            color: '#ffffff',
+            backgroundColor: '#000000',
+            padding: { x: 8, y: 4 },
+        });
+        this.interactionText.setDepth(100);
+        this.interactionText.setVisible(false);
+
+        // 마을 이름 표시
+        const townTitle = this.add.text(1200, 100, '⚔️ 바람의 마을 ⚔️', {
+            fontSize: '36px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4,
+        });
+        townTitle.setOrigin(0.5);
+        townTitle.setScrollFactor(0.5);
+
+        // 이벤트 리스너
+        GameEventBus.on('CHANGE_SCENE', this.handleSceneChange.bind(this));
+
+        // 씬 시작 알림
+        GameEventBus.emit('SCENE_CHANGED', 'town');
+        GameEventBus.emit('PLAYER_UPDATE', this.playerStats);
+    }
+
+    createNPCs() {
+        const npcPositions = [
+            { key: 'blacksmith', x: 900, y: 700, texture: 'npc_blacksmith' },
+            { key: 'innkeeper', x: 1100, y: 700, texture: 'npc_innkeeper' },
+            { key: 'alchemist', x: 1300, y: 700, texture: 'npc_alchemist' },
+            { key: 'sage', x: 1500, y: 700, texture: 'npc_sage' },
+            { key: 'merchant', x: 1200, y: 1100, texture: 'npc_merchant' },
+        ];
+
+        npcPositions.forEach((npcPos) => {
+            const npc = this.physics.add.sprite(npcPos.x, npcPos.y, npcPos.texture);
+            npc.setImmovable(true);
+            npc.setData('npcKey', npcPos.key);
+            npc.setScale(1.5);
+
+            // NPC 이름 표시
+            const npcData = NPC_DATA[npcPos.key];
+            const nameText = this.add.text(npcPos.x, npcPos.y - 60, npcData.name, {
+                fontSize: '14px',
+                color: '#ffff00',
+                stroke: '#000000',
+                strokeThickness: 2,
+            });
+            nameText.setOrigin(0.5);
+
+            // NPC 역할 표시
+            const roleText = this.add.text(npcPos.x, npcPos.y - 45, `[${npcData.role}]`, {
+                fontSize: '11px',
+                color: '#aaaaaa',
+                stroke: '#000000',
+                strokeThickness: 1,
+            });
+            roleText.setOrigin(0.5);
+
+            this.npcs.push(npc);
+        });
+    }
+
+    setupInput() {
+        // Spacebar - 상호작용
+        this.input.keyboard!.on('keydown-SPACE', () => {
+            if (this.nearbyNPC) {
+                this.interactWithNPC(this.nearbyNPC);
+            }
+        });
+
+        // ESC - 던전 메뉴
+        this.input.keyboard!.on('keydown-ESC', () => {
+            if (this.dialogueBox) {
+                this.closeDialogue();
+            } else {
+                GameEventBus.emit('TOGGLE_DUNGEON_MENU');
+            }
+        });
+
+        // I - 인벤토리
+        this.input.keyboard!.on('keydown-I', () => {
+            GameEventBus.emit('TOGGLE_INVENTORY');
+        });
+
+        // W - 스킬창
+        this.input.keyboard!.on('keydown-W', () => {
+            GameEventBus.emit('TOGGLE_SKILL_MENU');
+        });
+
+        // J - 퀘스트창
+        this.input.keyboard!.on('keydown-J', () => {
+            GameEventBus.emit('TOGGLE_QUEST_PANEL');
+        });
+    }
+
+    handleSceneChange(data: { scene: string; data?: Record<string, unknown> }) {
+        if (data.scene === 'DungeonScene') {
+            this.scene.start('DungeonScene', data.data);
+        }
+    }
+
+    interactWithNPC(npc: Phaser.Physics.Arcade.Sprite) {
+        const npcKey = npc.getData('npcKey');
+        const npcData = NPC_DATA[npcKey];
+
+        if (this.dialogueBox) {
+            this.closeDialogue();
+            return;
+        }
+
+        this.showDialogue(npcData);
+    }
+
+    showDialogue(npcData: typeof NPC_DATA[keyof typeof NPC_DATA]) {
+        const centerX = this.cameras.main.scrollX + this.cameras.main.width / 2;
+        const centerY = this.cameras.main.scrollY + this.cameras.main.height - 150;
+
+        this.dialogueBox = this.add.container(centerX, centerY);
+        this.dialogueBox.setDepth(200);
+
+        // 대화창 배경
+        const bg = this.add.graphics();
+        bg.fillStyle(0x000000, 0.9);
+        bg.fillRoundedRect(-400, -80, 800, 160, 16);
+        bg.lineStyle(3, 0xffd700);
+        bg.strokeRoundedRect(-400, -80, 800, 160, 16);
+        this.dialogueBox.add(bg);
+
+        // NPC 이름
+        const nameText = this.add.text(-380, -65, `${npcData.name} [${npcData.role}]`, {
+            fontSize: '20px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+        });
+        this.dialogueBox.add(nameText);
+
+        // 대화 내용
+        const dialogueText = this.add.text(-380, -35, npcData.dialogue, {
+            fontSize: '16px',
+            color: '#ffffff',
+            wordWrap: { width: 760 },
+        });
+        this.dialogueBox.add(dialogueText);
+
+        // 상점 아이템 미리보기
+        if (npcData.shopItems && npcData.shopItems.length > 0) {
+            const shopText = this.add.text(-380, 20, '📦 판매 품목:', {
+                fontSize: '14px',
+                color: '#aaffaa',
+            });
+            this.dialogueBox.add(shopText);
+
+            const itemsPreview = npcData.shopItems.slice(0, 3).map(item =>
+                `${item.icon} ${item.name} (${item.price}G)`
+            ).join('  |  ');
+
+            const itemsText = this.add.text
+Deployed the project
+Show More
+
+
+
+지금 여기 텍스트창에 전체 코드 복사할 수 있는 박스를 만들어줘
+
+            claude - opus - 4 - 5 - 20251101
+현재 프로젝트의 모든 파일 내용을 확인하고, 코드를 한번에 복사할 수 있는 페이지를 만들겠습니다.
+
+먼저 모든 파일들을 확인하겠습니다.모든 파일들을 읽고 코드 복사 페이지를 만들겠습니다.모든 파일을 확인했습니다.이제 코드를 한번에 복사할 수 있는 페이지를 만들겠습니다.이제 빌드하여 코드 복사 페이지가 정상 작동하는지 확인하겠습니다.빌드 성공했습니다! 코드 복사 페이지가 추가되었습니다.
+
+📋 코드 복사 기능 추가 완료
+사용 방법
+게임 화면 왼쪽 하단에 "📋 코드 보기" 버튼이 추가되었습니다.
+
+"📋 코드 보기" 버튼 클릭
+모든 소스 코드 파일 목록이 모달로 표시됨
+원하는 파일의 "복사" 버튼을 클릭하면 해당 파일 코드가 클립보드에 복사됨
+            "📦 전체 코드 복사" 버튼을 클릭하면 모든 파일의 코드가 한번에 복사됨
+기능 특징
+            19개 파일의 전체 소스 코드 포함
+파일별 개별 복사 가능
+전체 코드 한번에 복사 가능
+복사 성공 시 "복사됨!" 피드백 표시
+검색 기능으로 원하는 파일 빠르게 찾기
+문법 하이라이팅된 코드 표시
+포함된 파일 목록
+카테고리	파일
+설정	index.html, src / main.tsx, src / App.tsx
+게임 설정	GameConfig.ts, GameEventBus.ts
+씬	BootScene.ts, TownScene.ts, DungeonScene.ts
+데이터	items.ts, monsters.ts, npcs.ts, skills.ts
+매니저	InputManager.ts
+UI 컴포넌트	HUD.tsx, Inventory.tsx, DungeonSelector.tsx, SkillBar.tsx, QuestPanel.tsx, CodeViewer.tsx
+Deployed the project
+Show More
+
+
+
+가장 마지막으로 짠 코드들을 한번에 복사할 수 있는 텍스트 박스를 만들어줘
+
+            claude - opus - 4 - 5 - 20251101
+현재 프로젝트를 분석하고 개선할 수 있는 부분들을 찾아보겠습니다.
+
+
+                Listed 23 files
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Show More
+
+
+
+추가로 업데이트 하거나 개선할 수 있는 내용들을 스스로 찾아서 개선해줘.
+
+                gemini - 3 - pro
+I will check the current project files to ensure the resolution, monster spawn rates, and item auto - loot logic are correctly implemented.
+
+
+                Listed 23 files
+
+
+
+
+
+
+
+
+
+Show More
+
+
+
+게임의 해상도를 1920x1080으로 풀hd로 바꿔줘
+몬스터가 더 많이 나오게해줘
+아이템이 나오면 스스로 인벤토리창으로 들어오게해줘
+
+            claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+현재 파일들을 확인하고 요청사항을 적용하겠습니다.
+
+Reading src / game / config / GameConfig.ts failed
+
+
+
+
+
+
+
+
+Show More
+
+
+
+게임의 해상도를 1920x1080으로 풀hd로 바꿔줘
+몬스터가 더 많이 나오게해줘
+아이템이 나오면 스스로 인벤토리창으로 들어오게해줘
+            claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+현재 파일들을 확인하고 모든 개선사항을 적용하겠습니다.
+
+
+                Listed 22 files
+
+
+
+
+
+
+Show More
+
+
+
+몬스터가 더욱 많이 젠되었으면 좋겟어
+아이템창을 열면 esc버튼으로 끌 수 있게해줘
+게임의 해상도를 더 키워줘
+방향키로만 움직일 수 있게하고 wasd키는 움직이는 용도로 사용하지 말아줘
+사용 아이템창 처럼 사용 스킬창도 따로 만들어줘
+캐릭터가 너무 1차원적으로 좀 더 입체적으로 디자인해줘
+부족한 점들 있다면 개선하거나 프로그램을 추가해줘
+            claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 2 seconds
+
+현재 파일들을 확인하고 수정하겠습니다.
+
+Read src / game / scenes / DungeonScene.ts
+
+
+
+
+
+
+
+
+
+
+
+
+
+Show More
+
+
+
+혹시 캐릭터의 디자인을 입혀줄 수 없는걸까 ?
+
+                그리고 esc를 눌러서 설정화면을 열면 다시 esc를 눌러서 설정화면을 뒤로가거나 닫을 수 있게해줘
+
+몬스터 젠도 너무 느려 더 많은 몬스터가 출현할 수 있게 해줘
+
+            claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 1 second
+
+
+Listed 19 files
+
+
+
+
+
+
+
+Show More
+
+
+
+실행이 되지 않고 있는데
+
+            claude - opus - 4 - 5 - 20251101 - thinking - 32k
+
+Thought for 2 seconds
+
+
+Listed 8 files
+
+
+
+Show More
+
+
+
+            [개발 LLM에게 전달할 프롬프트 명령어]
+프로젝트 환경:
+
+Tech Stack: React(Vite), Phaser 3, TypeScript, Tailwind CSS
+            Path: src / game 내부에 게임 로직, src / components에 React UI 구현 예정
+요청 사항:
+현재 구축된 기본 뼈대 위에 "바람의 나라"와 같은 고전 2D MMORPG 느낌의 싱글 RPG 게임을 구현하려고 합니다.아래의 세부 기획 내용을 바탕으로 필요한 데이터 구조(Data Structure), 핵심 로직(Core Logic), 그리고 UI 연동 코드를 작성해 주세요.
+
+게임플레이 및 조작(Controls & Interaction)
+            목표: 마우스 없이 키보드 위주의 플레이가 가능해야 하며, 인벤토리 관리 등 특정 상황에서만 마우스를 병행합니다.
+기본 이동: 화살표 키 또는 WASD.
+                상호작용(Spacebar):
+NPC와 충돌 범위(Overlap) 내에 있을 때: 대화 시작.
+그 외의 상황: 기본 공격 실행.
+스킬 사용(1~9): 숫자키를 누르면 쿨타임과 마나를 소모하여 스킬 발동 + 화려한 이펙트(Phaser Particle / Sprite Animation) 출력.
+                퀵슬롯(Q, W, E, R, T): 등록된 소모품(포션, 주문서) 즉시 사용.
+메뉴 호출:
+            ESC: 사냥터 이동 메뉴(Dungeon Selector) 호출.
+                I: 인벤토리 창(React Overlay) 호출 / 닫기.
+2. 마을 및 NPC 데이터 구성(Town & NPCs)
+TownScene에 배치할 NPC 데이터와 상점 시스템을 src / game / data / npcs.ts와 같은 파일로 정의해 주세요.
+
+                대장장이(Weapon Merchant):
+            역할: 무기 / 방어구 판매 및 수리.
+                판매품: 목도(Lv1), 사미인곡(Lv50), 용마제구검(Lv99) 등 레벨 구간별 장비.
+                    주모 / 연금술사(Consumables):
+            역할: 체력 / 마력 회복 아이템 판매.
+                판매품: 동동주(초급), 막걸리(중급), 체력회복시약(고급).
+                    도사(Skill Master):
+            역할: 스킬북 판매(특정 레벨 도달 시 구매 가능).
+                잡화상(General Merchant):
+            역할: 귀환 주문서, 감정 돋보기 등 유틸리티 아이템.
+3. 사냥터 및 던전 시스템(Dungeon System)
+물리적인 맵 이동이 아닌, UI 선택형 텔레포트 시스템을 구현해 주세요.
+
+이동 방식: ESC 키 입력 -> React 모달 창 팝업 -> 사냥터 목록 선택 -> 해당 난이도의 DungeonScene으로 데이터(몬스터 레벨, 드랍테이블)를 전달하며 씬 전환.
+레벨 디자인: 1Lv ~300Lv까지 5레벨 단위로 구간 분리(총 60개 구간).
+                예: [초보자 사냥터(1 - 5Lv)], [쥐굴(6 - 10Lv)], ..., [흉가(96 - 100Lv)] ...
+            스케일링: 던전 레벨이 오를수록 몬스터의 HP, 공격력, 경험치 획득량이 지수 함수적으로 증가하도록 수식(Formula)을 짜주세요.
+4. 인벤토리 및 퀵슬롯 UI(Inventory & Hotbar)
+Phaser 화면 위에 React로 오버레이 UI를 구현해 주세요.
+
+                인벤토리(I Key):
+그리드 형태의 아이템 목록 표시.
+각 아이템은 아이콘, 이름, 수량, 설명 포함.
+                퀵슬롯(HUD):
+화면 하단 중앙에 Q, W, E, R, T 슬롯 항상 표시.
+                Drag & Drop: 인벤토리의 소모품을 마우스로 드래그하여 퀵슬롯에 놓으면 등록되도록 구현(HTML5 Drag and Drop API 활용).
+5. 성장 및 전투 시스템(Progression & Combat)
+            레벨링: 1~300 레벨.경험치 테이블 필요.
+                전투:
+플레이어와 몬스터 간의 Hitbox 충돌 처리.
+공격 시 데미지 텍스트(Floating Text) 팝업.
+몬스터 사망 시 확률적으로 아이템 / 골드 드랍 -> 플레이어가 밟으면(Overlap) 획득.
+작성 요청 파일 목록:
+
+            src / game / data / items.ts(아이템 DB)
+            src / game / data / monsters.ts(레벨별 몬스터 생성 로직)
+            src / game / managers / InputManager.ts(키보드 조작 통합 관리)
+            src / game / scenes / TownScene.ts(NPC 배치 및 상호작용 업데이트)
+            src / game / scenes / DungeonScene.ts(동적 난이도 생성)
+            src / components / UI / Inventory.tsx(React 인벤토리 & 드래그앤드롭)
+            src / App.tsx(Phaser와 React UI 간의 상태 동기화 로직 포함)
+위 내용을 바탕으로 과거 바람의 나라와 같은 손맛과 성장 재미를 느낄 수 있는 코드를 작성해 주세요.
+
+Ask a follow up...
+
+            Code
+

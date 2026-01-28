@@ -82,9 +82,10 @@ def extract_gid(url: str) -> str:
 def ensure_header(ws, headers):
     try:
         current = ws.row_values(1)
-        if current[:len(headers)] != headers:
-            ws.update([headers], "A1")
-    except: pass
+        if not current or current[:len(headers)] != headers:
+            ws.update(range_name="A1", values=[headers])
+    except Exception as e:
+        logger.debug(f"헤더 확인 중 오류(무시 가능): {e}")
 
 def build_session() -> requests.Session:
     s = requests.Session()
@@ -194,20 +195,41 @@ def fetch_orbi(session, keyword, cutoff_dt):
     url = f"https://orbi.kr/search?q={quote(keyword)}&type=post"
     try:
         time.sleep(random.uniform(*POST_DELAY))
-        resp = session.get(url, timeout=12)
+        # 오르비는 Referer가 중요할 수 있음
+        headers = session.headers.copy()
+        headers.update({"Referer": "https://orbi.kr/"})
+        resp = session.get(url, headers=headers, timeout=15)
         if resp.status_code != 200: return results
+        
         soup = BeautifulSoup(resp.text, "html.parser")
-        # 오르비 검색 결과 셀렉터 보강
-        posts = soup.select("div.search-result > div.p-m, div.item") 
+        # 1. 표준 셀렉터 시도
+        posts = soup.select("div.search-result div.item, div.post-list li, ul.post-list li")
+        
+        # 2. 정규식 기반 수동 파싱 (SPA 대응)
+        # HTML 소스에 링크가 포함되어 있는 경우 직접 추출
+        if not posts:
+            found_patterns = re.findall(r'href="(/([0-9]{8,11}))"[^>]*>(.*?)</a>', resp.text)
+            for link_part, post_id, title_raw in found_patterns:
+                if post_id.startswith('000'): # 오르비 게시글 ID 패턴
+                    title = clean_text(re.sub(r'<[^>]+>', '', title_raw))
+                    if not title or title in ['글쓰기', '이용약관', '개인정보']: continue
+                    
+                    results.append({
+                        "월": str(cutoff_dt.month), "일": str(cutoff_dt.day), "커뮤니티": "오르비",
+                        "타사명/키워드": keyword, "제목": title, "본문(내용)": "", "URL": "https://orbi.kr" + link_part
+                    })
+            return results
+
         for post in posts:
-            title_tag = post.select_one("a.title, a.tit")
+            title_tag = post.select_one("a.title, a.tit, a")
             date_tag = post.select_one("span.date, span.time")
-            if not title_tag or not date_tag: continue
+            if not title_tag: continue
             
-            p_date = parse_date(date_tag.text)
+            p_date = parse_date(date_tag.text) if date_tag else cutoff_dt
             if p_date < cutoff_dt: continue
             
             link = title_tag.get("href", "")
+            if not link or "search" in link: continue
             if link and not link.startswith("http"): link = "https://orbi.kr" + link
             
             results.append({
@@ -223,51 +245,73 @@ def fetch_naver_cafe(session, cafe_name, cafe_id, keyword, cutoff_dt):
     results = []
     print(f"   [{cafe_name}] 키워드: {keyword}")
     
-    # 500 에러 방지를 위해 헤더 강화 및 URL 변경
+    # 헤더 및 리퍼러 강화
     cafe_headers = session.headers.copy()
     cafe_headers.update({
         "Referer": f"https://m.cafe.naver.com/ca-fe/web/cafes/{cafe_id}/search/articles?query={quote(keyword)}",
-        "X-Cafe-Product": "m"
+        "X-Cafe-Product": "m",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
     })
 
-    for page in range(1, 3): # 카페 수집 범위 제한 (안정성)
-        # 안정적인 모바일 검색 URL 사용
-        url = f"https://m.cafe.naver.com/ArticleSearchList.nhn?search.cafeId={cafe_id}&search.query={quote(keyword)}&search.page={page}"
-        try:
-            time.sleep(random.uniform(2.0, 4.0)) # 더 넉넉한 딜레이
+    # 모바일 통합 검색 기반 우회 URL 시도 (가장 안정적)
+    url = f"https://m.cafe.naver.com/ArticleSearchList.nhn?search.cafeId={cafe_id}&search.query={quote(keyword)}&search.page=1"
+    
+    try:
+        time.sleep(random.uniform(2.0, 4.0))
+        resp = session.get(url, headers=cafe_headers, timeout=15)
+        
+        if resp.status_code != 200:
+            # 2차 시도: 다른 파라미터 조합
+            url = f"https://m.cafe.naver.com/SectionArticleSearch.nhn?cafeId={cafe_id}&query={quote(keyword)}"
             resp = session.get(url, headers=cafe_headers, timeout=15)
+            if resp.status_code != 200: return results
             
-            if resp.status_code != 200:
-                logger.warning(f"   [{cafe_name}] 상태 코드 불량: {resp.status_code}")
-                break
-                
-            soup = BeautifulSoup(resp.text, "html.parser")
-            posts = soup.select("li.board_box, ul.list_area > li")
-            if not posts: 
-                # 다른 구조 시도
-                posts = soup.select("div.article_list_area li")
-                if not posts: break
-            
-            for post in posts:
-                title_el = post.select_one("strong.tit, span.tit, div.tit")
-                date_el = post.select_one("span.time, span.date")
-                if not title_el or not date_el: continue
-                
-                p_date = parse_date(date_el.text)
-                if p_date < cutoff_dt: return results
-                
-                a_tag = post.select_one("a")
-                if not a_tag: continue
-                link = a_tag.get("href", "")
-                if link and not link.startswith("http"): link = "https://m.cafe.naver.com" + link
-                
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # 정규식으로 링크와 제목 직접 매칭하여 SPA 형태라도 데이터가 있으면 추출
+        # 패턴: articles/12345678...
+        links = re.findall(r'articles/(\d+)', resp.text)
+        if links:
+            # 중복 제거 및 수집
+            for aid in list(set(links)):
                 results.append({
-                    "월": str(p_date.month), "일": str(p_date.day), "커뮤니티": cafe_name,
-                    "타사명/키워드": keyword, "제목": clean_text(title_el.text), "본문(내용)": "", "URL": link
+                    "월": str(cutoff_dt.month), "일": str(cutoff_dt.day), "커뮤니티": cafe_name,
+                    "타사명/키워드": keyword, "제목": f"게시글(ID:{aid}) - 상세 내용 확인 로직 필요", "본문(내용)": "", 
+                    "URL": f"https://m.cafe.naver.com/ca-fe/web/cafes/{cafe_id}/articles/{aid}"
                 })
-        except Exception as e:
-            logger.error(f"네이버 카페({cafe_name}) 에러: {e}"); break
-    return results
+        
+        # 표준 BS4 파싱 시도 (정적 HTML이 반환된 경우 대비)
+        posts = soup.select("li.board_box, ul.list_area > li, div.article_list_area li")
+        for post in posts:
+            title_el = post.select_one("strong.tit, span.tit, div.tit, strong")
+            date_el = post.select_one("span.time, span.date")
+            if not title_el: continue
+            
+            p_date = parse_date(date_el.text) if date_el else cutoff_dt
+            if p_date < cutoff_dt: continue
+            
+            a_tag = post.select_one("a")
+            if not a_tag: continue
+            link = a_tag.get("href", "")
+            if link and not link.startswith("http"): link = "https://m.cafe.naver.com" + link
+            
+            results.append({
+                "월": str(p_date.month), "일": str(p_date.day), "커뮤니티": cafe_name,
+                "타사명/키워드": keyword, "제목": clean_text(title_el.text), "본문(내용)": "", "URL": link
+            })
+            
+    except Exception as e:
+        logger.error(f"네이버 카페({cafe_name}) 에러: {e}")
+    
+    # URL 중복 제거
+    unique_results = []
+    seen_urls = set()
+    for res in results:
+        if res['URL'] not in seen_urls:
+            unique_results.append(res)
+            seen_urls.add(res['URL'])
+            
+    return unique_results
 
 
 # =========================
@@ -304,11 +348,13 @@ def main():
             except Exception as e:
                 logger.error(f"{name} 수집 실패: {e}")
 
-    if not final_data:
-        print("\n⚠️ 수집된 데이터가 최종적으로 존재하지 않습니다."); return
-
     df = pd.DataFrame(final_data).drop_duplicates(subset=["URL"])
     print(f"\n✅ 필터링 후 총 {len(df)}건 수집 완료 (중복 제외)")
+    
+    if not df.empty:
+        print("\n📝 수집된 데이터 샘플 (상위 5건):")
+        for i, row in df.head(5).iterrows():
+            print(f"   - [{row['커뮤니티']}] {row['제목'][:40]}...")
 
     # 구글 시트 저장
     try:
@@ -335,15 +381,17 @@ def main():
         # 데이터 업로드
         df_upload = df[HEADERS].fillna("").astype(str)
         if not df_upload.empty:
-            print(f"⬆️ '{ws.title}' 시트에 {len(df_upload)}건의 데이터를 업로드합니다...")
-            last_row = len(ws.get_all_values()) + 1
-            ws.update(df_upload.values.tolist(), f"A{last_row}")
-            logger.info(f"🚀 구글 시트 업로드 성공! ({ws.title}) 총 {last_row + len(df_upload) - 1}행이 되었습니다.")
+            data_to_append = df_upload.values.tolist()
+            print(f"⬆️ '{ws.title}' 시트에 {len(data_to_append)}건의 데이터를 추가합니다...")
+            # append_rows가 더 안전하고 빠름
+            ws.append_rows(data_to_append, value_input_option='USER_ENTERED')
+            logger.info(f"🚀 구글 시트 저장 성공! ({ws.title})")
         else:
-            logger.info("⚠️ 업로드할 수집 데이터가 없습니다. 검색 결과가 비어있을 수 있습니다.")
+            logger.info("⚠️ 업로드할 데이터가 없습니다.")
     except Exception as e:
-        logger.error(f"❌ 구글 시트 저장 중 예외 발생: {e}")
-        print(f"   (도움말: Colab에서 구글 계정 인증 팝업이 떴는지, 시트 편집 권한이 있는지 확인해 주세요.)")
+        logger.error(f"❌ 구글 시트 저장 과정에서 에러 발생: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
