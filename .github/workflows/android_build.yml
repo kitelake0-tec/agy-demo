@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ai_book_scanner
 
     steps:
       - uses: actions/checkout@v4
@@ -37,4 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ai-book-scanner-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ai_book_scanner/build/app/outputs/flutter-apk/app-release.apk

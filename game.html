@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cheonmu Jaengpae - 2D Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #000;
+            color: white;
+            font-family: sans-serif;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        #ui-layer {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #4a4;
+            padding: 10px;
+            overflow-y: auto;
+            pointer-events: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+        }
+
+        .highlight {
+            color: #f0f;
+            font-weight: bold;
+        }
+
+        .damage {
+            color: #f00;
+        }
+
+        .item {
+            color: #0ff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="log-entry">시스템: 천무쟁패 시각화 클라이언트에 오신 것을 환영합니다.</div>
+            <div class="log-entry">시스템: 방향키로 이동, 스페이스바로 공격하세요.</div>
+        </div>
+    </div>
+
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game-container',
+            pixelArt: true,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        const game = new Phaser.Game(config);
+        let player;
+        let cursors;
+        let monsters = [];
+        let logBox;
+
+        // Asset filenames - relying on the copy command executed previously
+        // We need to find the exact filenames. Since they have timestamps, I will try to load them by wildcard or assume user renamed them? 
+        // Actually, I can't know the exact timestamp in JS. 
+        // I should have renamed them in the copy step. 
+        // Wait, I will use a clever trick: I will list the directory in the implementation plan or just handle it.
+        // For now, let's assume I will rename them in the next step or I will use the `find` tool to get exact names before writing this.
+        // Ah, I see the timestamped names in the previous turn's output.
+        // novice_village_background_1769836027070.png
+        // martial_artist_character_sprite_1769836044595.png
+        // wild_dog_monster_sprite_1769836059462.png
+        // I will write the code to look for these patterns or just rename them in the shell command step.
+
+        // REVISION: I will rename the files in the shell command for simplicity.
+        // So the code will reference simple names.
+
+        function preload() {
+            this.load.image('bg', 'assets/bg.png');
+            this.load.image('player', 'assets/player.png');
+            this.load.image('monster', 'assets/monster.png');
+        }
+
+        function create() {
+            // Background - Scale to fit or scroll
+            const bg = this.add.image(400, 300, 'bg');
+            bg.setDisplaySize(1200, 1200); // Make it large
+
+            // Player
+            player = this.physics.add.sprite(400, 300, 'player');
+            player.setDisplaySize(64, 64);
+            player.setCollideWorldBounds(true);
+
+            // Camera
+            this.cameras.main.startFollow(player);
+            this.cameras.main.setBounds(0, 0, 1200, 1200);
+            this.physics.world.setBounds(0, 0, 1200, 1200);
+
+            // Monsters
+            for (let i = 0; i < 5; i++) {
+                spawnMonster(this);
+            }
+
+            // Input
+            cursors = this.input.keyboard.createCursorKeys();
+            this.input.keyboard.on('keydown-SPACE', attack, this);
+
+            // UI
+            logBox = document.getElementById('ui-layer');
+            addLog("⚔️ [무림고수]가 무명촌에 접속했습니다.");
+        }
+
+        function update() {
+            const speed = 200;
+            player.setVelocity(0);
+
+            if (cursors.left.isDown) {
+                player.setVelocityX(-speed);
+                player.setFlipX(true);
+            } else if (cursors.right.isDown) {
+                player.setVelocityX(speed);
+                player.setFlipX(false);
+            }
+
+            if (cursors.up.isDown) {
+                player.setVelocityY(-speed);
+            } else if (cursors.down.isDown) {
+                player.setVelocityY(speed);
+            }
+        }
+
+        function spawnMonster(scene) {
+            const x = Phaser.Math.Between(100, 1100);
+            const y = Phaser.Math.Between(100, 1100);
+            const monster = scene.physics.add.sprite(x, y, 'monster');
+            monster.setDisplaySize(48, 48);
+            monsters.push(monster);
+        }
+
+        function attack() {
+            // Simple attack logic
+            const playerPos = player.getCenter();
+            let hit = false;
+
+            // Visual effect
+            const slash = game.scene.scenes[0].add.circle(playerPos.x, playerPos.y, 40, 0xffffff, 0.5);
+            game.scene.scenes[0].tweens.add({
+                targets: slash,
+                alpha: 0,
+                duration: 200,
+                onComplete: () => slash.destroy()
+            });
+
+            monsters.forEach((monster, index) => {
+                if (Phaser.Math.Distance.BetweenPoints(playerPos, monster.getCenter()) < 60) {
+                    hit = true;
+                    // Knockback
+                    const angle = Phaser.Math.Angle.BetweenPoints(playerPos, monster.getCenter());
+                    scene = game.scene.scenes[0]; // hack access
+                    monster.x += Math.cos(angle) * 20;
+                    monster.y += Math.sin(angle) * 20;
+
+                    monster.setTint(0xff0000);
+                    setTimeout(() => monster.clearTint(), 200);
+
+                    addLog(`<span class='damage'>💥 [무림고수]가 들개를 공격했습니다! (데미지: ${Phaser.Math.Between(10, 20)})</span>`);
+
+                    if (Math.random() > 0.7) {
+                        monster.destroy();
+                        monsters.splice(index, 1);
+                        addLog("💀 들개를 처치했습니다! 경험치 +10");
+                        setTimeout(() => spawnMonster(scene), 2000); // Respawn
+                    }
+                }
+            });
+
+            if (!hit) {
+                addLog("허공을 가릅니다!");
+            }
+        }
+
+        function addLog(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.innerHTML = msg;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+    </script>
+</body>
+
+</html>
