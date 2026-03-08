@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT vs Gemini vs Claude 비교 완전 정리 (2026년 3월 최신)</title>
+</head>
+
+<body
+  style="margin:0; padding:0; background:#f5f7fa; font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif; color:#333;">
+
+  <div style="max-width:780px; margin:0 auto; padding:40px 20px;">
+
+    <!-- 제목 -->
+    <h1 style="font-size:26px; font-weight:800; color:#1a1a2e; line-height:1.4; margin-bottom:8px;">
+      ChatGPT vs Gemini vs Claude…<br>어떤 AI가 나한테 맞을까?
+    </h1>
+    <p style="font-size:15px; color:#888; margin-top:0; margin-bottom:24px;">주요 LLM 비교 완전 정리 · 2026년 3월 최신 업데이트</p>
+
+    <!-- 대상 독자 박스 -->
+    <div
+      style="background:#eef6ff; border-left:4px solid #4a90d9; border-radius:8px; padding:18px 20px; margin-bottom:36px;">
+      <p style="margin:0 0 8px 0; font-weight:700; color:#4a90d9;">📌 이 글은 이런 분들을 위해 썼습니다</p>
+      <ul style="margin:0; padding-left:20px; color:#444; line-height:1.9; font-size:15px;">
+        <li>"ChatGPT, Gemini, Claude 다 들어봤는데 뭐가 다른지 모르겠어요"</li>
+        <li>"어떤 것을 써야 할지 몰라서 그냥 ChatGPT만 쓰고 있어요"</li>
+        <li>"상황에 따라 AI를 다르게 쓰면 좋다던데, 어떻게 하면 되나요?"</li>
+      </ul>
+    </div>
+
+    <!-- 섹션: AI가 많이 생긴 이유 -->
+    <h2
+      style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px; margin-top:0;">
+      🤔 시작 전에: AI가 이렇게 많이 생긴 이유</h2>
+    <p style="font-size:15px; line-height:1.85; color:#444;">지난 편에서 LLM(거대 언어 모델)이 무엇인지 배웠죠? 짧게 복습하자면, LLM은 수조 개의 텍스트를
+      학습한 언어의 달인입니다.<br>그런데 이 LLM을 만드는 회사가 한두 곳이 아닙니다.</p>
+
+    <table style="width:100%; border-collapse:collapse; margin-bottom:28px; font-size:14px;">
+      <thead>
+        <tr style="background:#1a1a2e; color:#fff;">
+          <th style="padding:12px 15px; text-align:left; border:1px solid #ddd;">회사</th>
+          <th style="padding:12px 15px; text-align:left; border:1px solid #ddd;">모델 (AI 이름)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#fff;">
+          <td style="padding:11px 15px; border:1px solid #eee;">OpenAI</td>
+          <td style="padding:11px 15px; border:1px solid #eee;"><strong>ChatGPT</strong> (GPT-5.2, GPT-5.3 Codex,
+            GPT-5.4 Thinking 등)</td>
+        </tr>
+        <tr style="background:#f9f9f9;">
+          <td style="padding:11px 15px; border:1px solid #eee;">Google DeepMind</td>
+          <td style="padding:11px 15px; border:1px solid #eee;"><strong>Gemini</strong> (Gemini 3.1 Pro, 3.1 Flash 등)
+          </td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:11px 15px; border:1px solid #eee;">Anthropic</td>
+          <td style="padding:11px 15px; border:1px solid #eee;"><strong>Claude</strong> (Claude Sonnet 4.6 등)</td>
+        </tr>
+        <tr style="background:#f9f9f9;">
+          <td style="padding:11px 15px; border:1px solid #eee;">Meta</td>
+          <td style="padding:11px 15px; border:1px solid #eee;"><strong>Llama</strong> (오픈소스)</td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:11px 15px; border:1px solid #eee;">네이버</td>
+          <td style="padding:11px 15px; border:1px solid #eee;"><strong>HyperCLOVA X</strong></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:15px; line-height:1.85; color:#444;">이 중에서 일반인이 가장 많이 쓰고, 가장 자주 비교되는 <strong>ChatGPT, Gemini,
+        Claude</strong> 세 가지를 오늘 집중적으로 살펴보겠습니다.</p>
+
+    <!-- 핵심 열쇳말 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">📦 세
+      AI를 이해하는 핵심 열쇳말</h2>
+    <div
+      style="background:#222; color:#e8e8e8; border-radius:10px; padding:20px 24px; font-family:monospace; font-size:15px; line-height:2; margin-bottom:32px;">
+      ChatGPT &nbsp;→ 📣 "팔방미인 만능 조수"<br>
+      Gemini &nbsp;&nbsp;&nbsp;→ 🔍 "구글의 검색+AI 융합"<br>
+      Claude &nbsp;&nbsp;&nbsp;→ 📖 "신중하고 성실한 독서왕"
+    </div>
+
+    <!-- ===== ChatGPT ===== -->
+    <div style="background:#fff; border-radius:14px; border:2px solid #d0e8ff; padding:28px; margin-bottom:28px;">
+      <h2 style="font-size:20px; font-weight:800; color:#1565c0; margin-top:0;">1️⃣ ChatGPT — 팔방미인 만능 조수</h2>
+      <p style="font-size:13px; color:#888; margin:-8px 0 16px; font-weight:600;">만든 곳: OpenAI (미국)</p>
+      <p style="font-size:15px; line-height:1.85; color:#444; margin-bottom:16px;">ChatGPT는 2022년 11월 출시 후 단 5일 만에 100만
+        사용자를 모은 역사상 가장 빠르게 퍼진 서비스입니다. 지금도 LLM 하면 가장 먼저 떠오르는 이름이죠.</p>
+
+      <!-- 최신 모델 뱃지 -->
+      <div style="background:#e3f0ff; border-radius:8px; padding:14px 18px; margin-bottom:18px;">
+        <p style="margin:0 0 10px; font-size:14px; font-weight:700; color:#1565c0;">💡 2026년 3월 현재 최신 모델</p>
+        <p style="margin:0 0 10px; font-size:13px; color:#555; line-height:1.6;">2026년 2월 기준, OpenAI는 GPT-4o 계열을 ChatGPT
+          인터페이스에서 <strong>공식 은퇴</strong>시키고 GPT-5 계열로 전환했습니다.</p>
+        <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;">
+          <thead>
+            <tr style="background:#1565c0; color:#fff;">
+              <th style="padding:9px 12px; text-align:left; border:1px solid #acd;">모델명</th>
+              <th style="padding:9px 12px; text-align:left; border:1px solid #acd;">특징</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f0f7ff;">
+              <td style="padding:9px 12px; border:1px solid #dde;"><strong>GPT-5.2</strong></td>
+              <td style="padding:9px 12px; border:1px solid #dde;">범용 기본 모델, 빠르고 안정적</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td style="padding:9px 12px; border:1px solid #dde;"><strong>GPT-5.3 Codex</strong></td>
+              <td style="padding:9px 12px; border:1px solid #dde;">코딩 전문 특화 모델</td>
+            </tr>
+            <tr style="background:#f0f7ff;">
+              <td style="padding:9px 12px; border:1px solid #dde;"><strong>GPT-5.4 Thinking</strong></td>
+              <td style="padding:9px 12px; border:1px solid #dde;">복잡한 추론·분석에 강한 고성능 모델</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td style="padding:9px 12px; border:1px solid #dde;"><strong>GPT-5.4 Pro</strong></td>
+              <td style="padding:9px 12px; border:1px solid #dde;">최고 성능 플래그십 모델</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size:14px; font-weight:700; color:#1565c0; margin:16px 0 8px;">ChatGPT가 잘하는 것</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>✅ <strong>다양한 작업</strong>: 글쓰기, 코딩, 번역, 요약, 창작까지 두루두루 잘함</li>
+        <li>✅ <strong>플러그인 &amp; 도구 연동</strong>: DALL-E로 이미지 생성, 코드 실행, 파일 분석 가능</li>
+        <li>✅ <strong>방대한 생태계</strong>: GPT 스토어를 통해 수천 개의 커스텀 챗봇 활용 가능</li>
+        <li>✅ <strong>멀티모달</strong>: 이미지, 음성, 동영상까지 이해하고 답변</li>
+        <li>✅ <strong>에이전틱 워크플로우</strong>: 복잡한 작업을 자동으로 단계별로 처리하는 AI 에이전트 기능 강화</li>
+      </ul>
+      <p style="font-size:14px; font-weight:700; color:#1565c0; margin:0 0 8px;">아쉬운 점</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>❌ 고성능 모델(GPT-5.4 Thinking/Pro)은 유료 플랜 필요 ($20/월~)</li>
+        <li>❌ 모델 종류가 너무 많아 처음 쓰는 분께는 혼란스러울 수 있음</li>
+        <li>❌ 웹 검색 기능은 있지만 실시간 정확도가 완벽하지는 않음</li>
+      </ul>
+      <div style="background:#dceffe; border-radius:8px; padding:14px 18px;">
+        <p style="margin:0; font-size:14px; color:#1565c0;">💡 <strong>이런 분께 추천</strong>: AI를 처음 시작하거나, 이것저것 다양하게 써보고 싶은
+          분. 하나의 플랫폼에서 글쓰기, 이미지 생성, 코딩 도움을 모두 받고 싶을 때.</p>
+      </div>
+    </div>
+
+    <!-- ===== Gemini ===== -->
+    <div style="background:#fff; border-radius:14px; border:2px solid #c8e6c9; padding:28px; margin-bottom:28px;">
+      <h2 style="font-size:20px; font-weight:800; color:#2e7d32; margin-top:0;">2️⃣ Gemini — 구글의 검색+AI 융합</h2>
+      <p style="font-size:13px; color:#888; margin:-8px 0 16px; font-weight:600;">만든 곳: Google DeepMind (미국)</p>
+      <p style="font-size:15px; line-height:1.85; color:#444; margin-bottom:16px;">Gemini는 구글이 만든 AI입니다. 구글 검색, Gmail,
+        구글 드라이브, 유튜브 등 구글의 모든 서비스와 연동되는 것이 가장 큰 강점입니다.</p>
+
+      <div style="background:#e8f5e9; border-radius:8px; padding:14px 18px; margin-bottom:18px;">
+        <p style="margin:0 0 10px; font-size:14px; font-weight:700; color:#2e7d32;">💡 2026년 3월 현재 최신 모델</p>
+        <p style="margin:0 0 10px; font-size:13px; color:#555; line-height:1.6;">2026년 2~3월에 걸쳐 Gemini <strong>3.1
+            시리즈</strong>가 출시되었습니다.</p>
+        <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;">
+          <thead>
+            <tr style="background:#2e7d32; color:#fff;">
+              <th style="padding:9px 12px; text-align:left; border:1px solid #a5d6a7;">모델명</th>
+              <th style="padding:9px 12px; text-align:left; border:1px solid #a5d6a7;">특징</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f1f8e9;">
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;"><strong>Gemini 3.1 Pro</strong></td>
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;">고급 추론, 복잡한 작업에 최적화, 100만 토큰 컨텍스트</td>
+            </tr>
+            <tr style="background:#fff;">
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;"><strong>Gemini 3.1 Flash</strong></td>
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;">고성능 + 빠른 속도의 균형 모델</td>
+            </tr>
+            <tr style="background:#f1f8e9;">
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;"><strong>Gemini 3.1 Flash-Lite</strong></td>
+              <td style="padding:9px 12px; border:1px solid #c8e6c9;">번역·분류 등 대용량 처리에 특화, 초저비용 (2026.03.03 출시)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin:10px 0 0; font-size:12px; color:#777;">※ 기존 Gemini 2.0 Flash는 2026년 6월 1일 공식 종료 예정</p>
+      </div>
+
+      <p style="font-size:14px; font-weight:700; color:#2e7d32; margin:16px 0 8px;">Gemini가 잘하는 것</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>✅ <strong>최신 정보</strong>: 구글 검색과 연동되어 실시간으로 최신 정보를 바탕으로 답변</li>
+        <li>✅ <strong>구글 서비스 연동</strong>: Gmail 초안 작성, 구글 드라이브 파일 분석, 유튜브 요약 등</li>
+        <li>✅ <strong>긴 맥락 이해</strong>: 매우 긴 문서(책 한 권 분량)도 통째로 넣고 분석 가능 (100만 토큰 지원)</li>
+        <li>✅ <strong>코딩 능력</strong>: Google Colab과 연동되어 개발자에게 유용</li>
+      </ul>
+      <div
+        style="background:#f0faf0; border-radius:8px; padding:14px 18px; border-left:3px solid #66bb6a; margin-bottom:14px;">
+        <p style="margin:0 0 6px; font-size:13px; font-weight:700; color:#2e7d32;">🔍 실시간 정보, 이게 얼마나 중요한 걸까요?</p>
+        <p style="margin:0; font-size:13px; color:#555; line-height:1.7;">ChatGPT나 Claude는 특정 날짜까지만 학습한 데이터를 기반으로 답변합니다.
+          예를 들어 "오늘 코스피 지수는?"이라고 물으면 모릅니다. 하지만 Gemini는 구글 검색을 통해 지금 이 순간의 정보를 가져올 수 있습니다. 이 차이가 생각보다 큽니다.</p>
+      </div>
+      <p style="font-size:14px; font-weight:700; color:#2e7d32; margin:0 0 8px;">아쉬운 점</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>❌ 구글 생태계 밖에서는 강점이 덜함</li>
+        <li>❌ 한국어 최적화 수준이 ChatGPT, Claude 대비 살짝 아쉽다는 평가</li>
+      </ul>
+      <div style="background:#dcedc8; border-radius:8px; padding:14px 18px;">
+        <p style="margin:0; font-size:14px; color:#2e7d32;">💡 <strong>이런 분께 추천</strong>: 구글 Gmail, 드라이브를 주로 쓰시는 분. 뉴스,
+          최근 동향처럼 실시간 정보를 자주 찾아야 하는 분. 긴 PDF나 보고서를 통째로 분석해야 하는 분.</p>
+      </div>
+    </div>
+
+    <!-- ===== Claude ===== -->
+    <div style="background:#fff; border-radius:14px; border:2px solid #e1bee7; padding:28px; margin-bottom:36px;">
+      <h2 style="font-size:20px; font-weight:800; color:#6a1b9a; margin-top:0;">3️⃣ Claude — 신중하고 성실한 독서왕</h2>
+      <p style="font-size:13px; color:#888; margin:-8px 0 16px; font-weight:600;">만든 곳: Anthropic (미국)</p>
+      <p style="font-size:15px; line-height:1.85; color:#444; margin-bottom:16px;">Anthropic은 OpenAI의 핵심 연구자들이 나와 만든
+        회사입니다. Claude는 <strong>"안전하고 신뢰할 수 있는 AI"</strong>를 목표로 개발됐습니다. ChatGPT보다 덜 알려졌지만, 한번 써본 사람들이 가장 열렬히 추천하는 AI이기도
+        합니다.</p>
+
+      <div style="background:#f3e5f5; border-radius:8px; padding:14px 18px; margin-bottom:18px;">
+        <p style="margin:0 0 10px; font-size:14px; font-weight:700; color:#6a1b9a;">💡 2026년 3월 현재 최신 모델</p>
+        <p style="margin:0 0 10px; font-size:13px; color:#555; line-height:1.6;">2026년 2월 17일, <strong>Claude Sonnet
+            4.6</strong>이 출시되었습니다. Anthropic 역대 최강의 Sonnet 모델입니다.</p>
+        <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;">
+          <thead>
+            <tr style="background:#6a1b9a; color:#fff;">
+              <th style="padding:9px 12px; text-align:left; border:1px solid #ce93d8;">모델명</th>
+              <th style="padding:9px 12px; text-align:left; border:1px solid #ce93d8;">특징</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#fdf5ff;">
+              <td style="padding:9px 12px; border:1px solid #e1bee7;"><strong>Claude Sonnet 4.6</strong></td>
+              <td style="padding:9px 12px; border:1px solid #e1bee7;">코딩·추론·장문 분석 강화, 100만 토큰 컨텍스트(베타), claude.ai 기본 모델
+              </td>
+            </tr>
+            <tr style="background:#fff;">
+              <td style="padding:9px 12px; border:1px solid #e1bee7;">Claude Opus 4.5</td>
+              <td style="padding:9px 12px; border:1px solid #e1bee7;">플래그십 최상위 모델 (2025년 11월 출시)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size:14px; font-weight:700; color:#6a1b9a; margin:16px 0 8px;">Claude가 잘하는 것</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>✅ <strong>글쓰기 품질</strong>: 자연스럽고 문맥에 맞는 긴 글 작성 능력이 탁월. 보고서, 에세이, 창작에서 빛남</li>
+        <li>✅ <strong>긴 대화 맥락 유지</strong>: 복잡한 맥락을 오랫동안 정확히 기억하며 대화 가능 (100만 토큰)</li>
+        <li>✅ <strong>솔직함</strong>: 모르면 모른다고, 틀리면 틀렸다고 말하는 경향. 신뢰도 높음</li>
+        <li>✅ <strong>코딩·추론 강화</strong>: Sonnet 4.6부터 코딩, 에이전트 계획, 복잡한 추론 능력이 크게 향상</li>
+        <li>✅ <strong>웹 검색 지원</strong>: 이제 Claude도 웹 검색 기능 추가로 최신 정보 접근 가능</li>
+      </ul>
+      <p style="font-size:14px; font-weight:700; color:#6a1b9a; margin:0 0 8px;">아쉬운 점</p>
+      <ul style="margin:0 0 14px; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>❌ 이미지 생성 기능이 없음 (텍스트 특화)</li>
+        <li>❌ 무료 플랜의 메시지 횟수 제한이 타 AI보다 빠듯함</li>
+        <li>❌ 국내 인지도는 아직 ChatGPT, Gemini보다 낮음</li>
+      </ul>
+      <div style="background:#ede7f6; border-radius:8px; padding:14px 18px;">
+        <p style="margin:0; font-size:14px; color:#6a1b9a;">💡 <strong>이런 분께 추천</strong>: 긴 보고서, 기획서, 블로그 포스팅처럼 퀄리티 높은
+          글쓰기가 필요한 분. 복잡한 자료를 분석하고 정리해야 하는 분. 솔직하고 신뢰성 있는 답변을 원하는 분.</p>
+      </div>
+    </div>
+
+    <!-- 통합 비교표 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">📊
+      한눈에 비교: 어떤 AI를 언제 쓸까? (2026년 3월 기준)</h2>
+    <div style="overflow-x:auto; margin-bottom:36px;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px; min-width:500px;">
+        <thead>
+          <tr style="background:#1a1a2e; color:#fff;">
+            <th style="padding:12px 14px; text-align:left; border:1px solid #333;">항목</th>
+            <th style="padding:12px 14px; text-align:center; border:1px solid #333; color:#90caf9;">ChatGPT</th>
+            <th style="padding:12px 14px; text-align:center; border:1px solid #333; color:#a5d6a7;">Gemini</th>
+            <th style="padding:12px 14px; text-align:center; border:1px solid #333; color:#ce93d8;">Claude</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#f7f7fa;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">현재 주력 모델</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; font-size:12px;">GPT-5.4
+              Thinking/Pro</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; font-size:12px;">Gemini 3.1 Pro</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; font-size:12px;">Claude Sonnet 4.6
+            </td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">🌐 실시간 정보</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">△ 웹 검색</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#2e7d32; font-weight:700;">✅
+              강점</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">△ 웹 검색 추가</td>
+          </tr>
+          <tr style="background:#f7f7fa;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">✍️ 글쓰기 품질</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#6a1b9a; font-weight:700;">✅
+              강점</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">💻 코딩</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅ Codex 모델</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#6a1b9a; font-weight:700;">✅
+              강점</td>
+          </tr>
+          <tr style="background:#f7f7fa;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">🖼️ 이미지 생성</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅ DALL-E</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅ Imagen</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#aaa;">❌</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">📁 파일 분석</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#6a1b9a; font-weight:700;">✅
+              강점</td>
+          </tr>
+          <tr style="background:#f7f7fa;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">🔗 서비스 연동</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; font-size:13px;">OpenAI 생태계</td>
+            <td
+              style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#2e7d32; font-weight:700; font-size:13px;">
+              구글 전체 생태계</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#aaa; font-size:13px;">없음</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">😊 한국어 수준</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">△</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">✅</td>
+          </tr>
+          <tr style="background:#f7f7fa;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">📏 최대 컨텍스트</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">1M 토큰</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">1M 토큰</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">1M 토큰 (베타)</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:11px 14px; border:1px solid #eee; font-weight:600;">💰 무료 플랜</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">있음 (제한)</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center; color:#2e7d32; font-weight:700;">있음
+              (관대)</td>
+            <td style="padding:11px 14px; border:1px solid #eee; text-align:center;">있음 (빠듯)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 상황별 추천 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">💡
+      상황별 추천 가이드</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:36px;">
+      <thead>
+        <tr style="background:#1a1a2e; color:#fff;">
+          <th style="padding:12px 14px; text-align:left; border:1px solid #333;">이런 상황에는…</th>
+          <th style="padding:12px 14px; text-align:left; border:1px solid #333;">이 AI를 쓰세요</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#fff;">
+          <td style="padding:10px 14px; border:1px solid #eee;">AI를 처음 써보고 뭐든 해보고 싶다</td>
+          <td style="padding:10px 14px; border:1px solid #eee; color:#1565c0; font-weight:700;">ChatGPT</td>
+        </tr>
+        <tr style="background:#f7f7fa;">
+          <td style="padding:10px 14px; border:1px solid #eee;">지금 핫한 뉴스나 주식 정보를 알고 싶다</td>
+          <td style="padding:10px 14px; border:1px solid #eee; color:#2e7d32; font-weight:700;">Gemini</td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:10px 14px; border:1px solid #eee;">이메일/보고서를 자연스럽게 써달라</td>
+          <td style="padding:10px 14px; border:1px solid #eee; color:#6a1b9a; font-weight:700;">Claude</td>
+        </tr>
+        <tr style="background:#f7f7fa;">
+          <td style="padding:10px 14px; border:1px solid #eee;">이미지를 만들어달라</td>
+          <td style="padding:10px 14px; border:1px solid #eee;"><span
+              style="color:#1565c0; font-weight:700;">ChatGPT</span> or <span
+              style="color:#2e7d32; font-weight:700;">Gemini</span></td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:10px 14px; border:1px solid #eee;">구글 드라이브 파일을 분석해달라</td>
+          <td style="padding:10px 14px; border:1px solid #eee; color:#2e7d32; font-weight:700;">Gemini</td>
+        </tr>
+        <tr style="background:#f7f7fa;">
+          <td style="padding:10px 14px; border:1px solid #eee;">긴 PDF를 요약해달라</td>
+          <td style="padding:10px 14px; border:1px solid #eee;"><span
+              style="color:#6a1b9a; font-weight:700;">Claude</span> or <span
+              style="color:#2e7d32; font-weight:700;">Gemini</span></td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:10px 14px; border:1px solid #eee;">나만의 챗봇을 만들어 쓰고 싶다</td>
+          <td style="padding:10px 14px; border:1px solid #eee; color:#1565c0; font-weight:700;">ChatGPT (GPT 스토어)</td>
+        </tr>
+        <tr style="background:#f7f7fa;">
+          <td style="padding:10px 14px; border:1px solid #eee;">코드를 짜거나 오류를 고쳐달라</td>
+          <td style="padding:10px 14px; border:1px solid #eee;"><span style="color:#1565c0; font-weight:700;">ChatGPT
+              (Codex)</span> or <span style="color:#6a1b9a; font-weight:700;">Claude</span></td>
+        </tr>
+        <tr style="background:#fff;">
+          <td style="padding:10px 14px; border:1px solid #eee;">복잡한 논리 문제·수학·추론이 필요하다</td>
+          <td style="padding:10px 14px; border:1px solid #eee;"><span style="color:#1565c0; font-weight:700;">ChatGPT
+              (Thinking)</span> or <span style="color:#6a1b9a; font-weight:700;">Claude</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 실전 팁 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">🛠️
+      실전 팁: 세 가지를 다 써야 할까요?</h2>
+    <p style="font-size:15px; line-height:1.85; color:#444;">꼭 하나만 써야 한다는 법은 없지만, 처음에는 <strong>하나에 집중하는 것</strong>을
+      추천합니다.</p>
+    <ol style="font-size:15px; line-height:2; color:#444; padding-left:24px; margin-bottom:20px;">
+      <li><strong>깊이 쓸수록 잘 쓰게 됩니다.</strong> AI도 쓰면 쓸수록 요령이 생깁니다. 이것저것 바꾸면 그 요령이 분산됩니다.</li>
+      <li><strong>맥락이 쌓입니다.</strong> 같은 AI에서 대화를 이어나가면 AI가 내 스타일을 학습하고 더 나은 결과를 냅니다.</li>
+      <li><strong>피로감이 줄어듭니다.</strong> AI 선택 자체가 번거롭게 느껴지면, 결국 AI를 안 쓰게 됩니다.</li>
+    </ol>
+    <div
+      style="background:#fff8e1; border-left:4px solid #ffc107; border-radius:8px; padding:18px 20px; margin-bottom:36px;">
+      <p style="margin:0 0 10px; font-weight:700; color:#f57f17;">💡 추천 전략</p>
+      <ol style="margin:0; padding-left:20px; font-size:14px; line-height:2; color:#444;">
+        <li>Gemini (무료, 구글 계정으로 바로 시작)로 시작</li>
+        <li>글쓰기와 분석이 많다면 Claude 추가 사용</li>
+        <li>이미지 생성이나 더 다양한 기능이 필요하면 ChatGPT 추가</li>
+      </ol>
+    </div>
+
+    <!-- 앞으로는 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">🔮
+      앞으로는 어떻게 될까요?</h2>
+    <p style="font-size:15px; line-height:1.85; color:#444;">2026년 현재, 세 AI는 놀라운 속도로 <strong>비슷해지는 방향</strong>으로 발전하고
+      있습니다.</p>
+    <ul style="font-size:15px; line-height:2.1; color:#444; padding-left:24px; margin-bottom:18px;">
+      <li><strong>Claude</strong>도 웹 검색 기능을 추가해 실시간 정보 접근이 가능해졌고</li>
+      <li><strong>Gemini</strong>도 코딩, 추론 능력을 계속 개선하고 있으며</li>
+      <li><strong>ChatGPT</strong>도 글 분석, 에이전트 능력이 크게 올라왔습니다</li>
+      <li>세 모델 <strong>모두 100만 토큰 컨텍스트</strong>를 지원하게 됐습니다</li>
+    </ul>
+    <p style="font-size:15px; line-height:1.85; color:#444; margin-bottom:36px;">결국 가장 중요한 것은 <strong>어떤 AI를 쓰느냐가 아니라,
+        AI를 얼마나 잘 쓰느냐</strong>입니다. 지난 편에서 얘기한 프롬프트 엔지니어링과 비판적 사고가 여기서도 핵심입니다.</p>
+
+    <!-- 핵심 정리 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">🎯 핵심
+      정리</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:36px;">
+      <thead>
+        <tr style="background:#1a1a2e; color:#fff;">
+          <th style="padding:12px 14px; text-align:left; border:1px solid #333;">AI</th>
+          <th style="padding:12px 14px; text-align:left; border:1px solid #333;">2026년 주력 모델</th>
+          <th style="padding:12px 14px; text-align:left; border:1px solid #333;">이것만 기억하세요</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#e3f0ff;">
+          <td style="padding:12px 14px; border:1px solid #eee; font-weight:700; color:#1565c0;">ChatGPT</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">GPT-5.4 Thinking/Pro</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">팔방미인, 다양한 도구와 연동, AI 입문에 최적</td>
+        </tr>
+        <tr style="background:#e8f5e9;">
+          <td style="padding:12px 14px; border:1px solid #eee; font-weight:700; color:#2e7d32;">Gemini</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">Gemini 3.1 Pro</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">구글 생태계 + 실시간 정보, 최신 트렌드에 강함</td>
+        </tr>
+        <tr style="background:#f3e5f5;">
+          <td style="padding:12px 14px; border:1px solid #eee; font-weight:700; color:#6a1b9a;">Claude</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">Claude Sonnet 4.6</td>
+          <td style="padding:12px 14px; border:1px solid #eee;">글쓰기 퀄리티 최고, 신뢰할 수 있는 솔직한 답변</td>
+        </tr>
+      </tbody>
+    </table>
+    <div
+      style="background:#1a1a2e; color:#fff; border-radius:12px; padding:22px 24px; text-align:center; margin-bottom:36px;">
+      <p style="margin:0; font-size:16px; font-weight:700; line-height:1.7;">셋 다 훌륭합니다. 하나를 선택해서 꾸준히 써보세요.<br><span
+          style="color:#90caf9;">사용하다 보면 자연스럽게 어떤 상황에 어떤 AI가 더 맞는지 감이 잡힙니다.</span></p>
+    </div>
+
+    <!-- 마치며 -->
+    <h2 style="font-size:20px; font-weight:700; color:#1a1a2e; border-bottom:2px solid #eee; padding-bottom:10px;">🚀
+      마치며: AI는 도구입니다</h2>
+    <p style="font-size:15px; line-height:1.85; color:#444;">스마트폰에 카카오톡, 네이버, 구글이 함께 있듯이, AI도 여러 서비스를 때에 따라 골라 쓰는
+      도구입니다.<br>지나치게 많은 것을 알려고 하기보다는, 오늘 당장 한 가지를 직접 열어서 간단한 질문을 던져보세요.</p>
+    <div style="background:#f0f4ff; border-radius:10px; padding:20px 24px; text-align:center; margin-bottom:28px;">
+      <p style="margin:0; font-size:17px; font-weight:700; color:#1a1a2e;">"안녕? 나 AI 처음 써보는데, 오늘 점심 뭐 먹을지 추천해줘." 😊</p>
+    </div>
+    <p style="font-size:15px; line-height:1.85; color:#444; margin-bottom:36px;">이것 하나로 시작해도 충분합니다.</p>
+
+    <!-- 푸터 -->
+    <div style="border-top:1px solid #eee; padding-top:20px; color:#aaa; font-size:12px; line-height:1.8;">
+      <p style="margin:0 0 6px;">※ 이 글은 2026년 3월 8일 기준으로 작성되었습니다. AI 업계 특성상 모델은 빠르게 업데이트되므로, 각 회사의 공식 사이트에서 최신 정보를 확인해
+        주세요.</p>
+      <p style="margin:0;">다음 편에서는 ChatGPT, Gemini를 실제 업무에서 활용하는 구체적인 프롬프트 예시와 함께, 직장인이 바로 쓸 수 있는 AI 활용 템플릿을 소개해 드립니다.
+      </p>
+    </div>
+
+  </div>
+</body>
+
+</html>
