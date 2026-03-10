@@ -1,0 +1,37 @@
+# Interview Scratchpad / 인터뷰 메모 - 연애문제 (relationship-problems)
+
+## Context / 맥락
+- Date / 날짜: 2026-03-09
+- Reference / 참고자료: None
+
+## Emerging Themes / 주요 주제
+(Update as patterns surface / 패턴이 나타나면 업데이트)
+-
+
+## Key Insights / 핵심 인사이트
+(Important points stated by the interviewee / 인터뷰 대상자가 밝힌 중요한 사항)
+-
+
+## Constraints & Boundaries / 제약사항 및 경계
+(Non-negotiables, limitations, boundaries / 필수조건, 제한사항, 경계)
+-
+
+## Decisions Made / 결정사항
+(Things already decided / 이미 결정된 사항)
+-
+
+## Tensions / Trade-offs / 긴장관계 및 트레이드오프
+(Conflicting goals or competing priorities / 상충하는 목표나 우선순위)
+-
+
+## Areas to Dig Deeper / 더 탐색할 영역
+- [ ] 구체적인 연애 고민의 내용과 현재 상황 파악
+- [ ]
+
+## Key Quotes / 핵심 인용
+(Memorable phrasings worth preserving verbatim / 그대로 보존할 가치가 있는 표현)
+- "interview 하고 싶어 - 연애문제"
+
+## Open Questions / 미해결 질문
+(Unresolved or deferred items / 해결되지 않았거나 보류된 항목)
+-
