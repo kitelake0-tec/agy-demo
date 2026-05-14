@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+  <style>
+    .prose { max-width: none; }
+    #editor-container { 
+      height: 600px; 
+      margin-bottom: 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased font-sans">
+
+<div id="app" class="flex h-screen overflow-hidden">
+  <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col shadow-xl z-20">
+    <div class="p-6 text-xl font-extrabold border-b border-slate-700 tracking-wide">Internal Wiki</div>
+    <div class="p-4 overflow-y-auto flex-grow" id="category-list"></div>
+    <div class="p-4 border-t border-slate-700">
+      <button onclick="showEditor()" class="w-full bg-blue-600 hover:bg-blue-500 transition-colors py-3 rounded-lg font-bold shadow-lg">
+        + 새 문서 작성
+      </button>
+    </div>
+  </aside>
+
+  <main class="flex-grow flex flex-col overflow-hidden relative">
+    
+    <header class="bg-white border-b border-gray-200 p-4 flex gap-4 items-center shadow-sm z-10">
+      <div class="flex-grow relative">
+        <input type="text" id="searchInput" placeholder="무엇을 찾고 계신가요? 띄어쓰기로 여러 단어 동시 검색 가능"
+               class="w-full border border-gray-300 rounded-lg pl-4 pr-10 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+      </div>
+      <select id="searchType" class="border border-gray-300 rounded-lg px-4 py-2.5 bg-white outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="all">전체 검색</option>
+        <option value="title">제목만</option>
+        <option value="content">본문만</option>
+      </select>
+    </header>
+
+    <div class="flex-grow overflow-y-auto p-8" id="view-area">
+      <div id="welcome-screen" class="text-center mt-32 text-gray-400">
+        <svg class="mx-auto h-16 w-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h2 class="text-2xl font-bold text-gray-500">지식 베이스에 오신 것을 환영합니다.</h2>
+        <p class="mt-2 text-gray-400">좌측에서 카테고리를 선택하거나 새 문서를 작성해 보세요.</p>
+      </div>
+      
+      <div id="doc-list" class="grid gap-4 max-w-5xl mx-auto hidden"></div>
+
+      <div id="doc-viewer" class="hidden bg-white p-10 rounded-xl shadow-sm border border-gray-100 max-w-5xl mx-auto">
+        <div class="flex justify-between items-start mb-6">
+          <h1 id="v-title" class="text-4xl font-extrabold text-slate-900 leading-tight"></h1>
+          <div class="flex gap-2 flex-shrink-0 ml-4">
+            <button id="edit-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition">편집하기</button>
+            <button id="delete-btn" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 hover:border-red-300 px-4 py-2 rounded-lg text-sm font-bold transition">삭제하기</button>
+          </div>
+        </div>
+        <div id="v-meta" class="text-sm text-gray-500 mb-8 pb-4 border-b border-gray-200 flex gap-4"></div>
+        <div id="v-content" class="prose lg:prose-lg max-w-none text-gray-700"></div>
+      </div>
+    </div>
+
+    <div id="editor-area" class="hidden absolute inset-0 bg-white z-50 flex flex-col p-8 overflow-y-auto">
+      <div class="max-w-5xl mx-auto w-full flex flex-col h-full bg-white">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-slate-800" id="editor-header-title">문서 작성</h2>
+        </div>
+        
+        <div class="flex gap-4 mb-6">
+          <input type="text" id="e-title" placeholder="문서 제목을 입력하세요" class="flex-grow text-2xl font-bold border-b-2 border-gray-200 p-2 outline-none focus:border-blue-500 transition bg-transparent">
+          <input type="text" id="e-category" placeholder="카테고리 (예: 개발, 인사)" class="w-48 text-lg border-b-2 border-gray-200 p-2 outline-none focus:border-blue-500 transition bg-transparent">
+        </div>
+        
+        <div id="editor-container" class="flex-grow shadow-sm"></div>
+        
+        <div class="flex justify-end gap-3 mt-6">
+          <button onclick="hideEditor()" class="px-6 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition">취소</button>
+          <button id="save-btn" onclick="handleSave()" class="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition flex items-center gap-2">
+            저장하기
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script>
+  let state = { docs: [], currentDocId: null, categories: [] };
+  let editor = null;
+  let viewerInstance = null;
+
+  // 1. 초기화
+  window.onload = () => {
+    initEditor();
+    loadData();
+    document.getElementById('searchInput').oninput = debounce(handleSearch, 300);
+    document.getElementById('searchType').onchange = handleSearch;
+  };
+
+  // 2. 서버에서 데이터 불러오기
+  function loadData(docIdToShow = null) {
+    document.body.style.cursor = 'wait';
+    google.script.run
+      .withSuccessHandler(data => {
+        document.body.style.cursor = 'default';
+        state = { ...state, ...data };
+        renderCategories();
+        
+        if (docIdToShow) {
+          viewDoc(docIdToShow);
+        } else {
+          renderDocList(state.docs);
+        }
+      })
+      .withFailureHandler(err => {
+        document.body.style.cursor = 'default';
+        alert("데이터 로드 실패: " + err);
+      })
+      .getInitialData();
+  }
+
+  // 3. 에디터 초기화
+  function initEditor() {
+    editor = new toastui.Editor({
+      el: document.querySelector('#editor-container'),
+      height: '100%',
+      initialEditType: 'wysiwyg',
+      previewStyle: 'vertical',
+      placeholder: '이곳에 내용을 자유롭게 작성해 주세요. (상단 탭에서 마크다운 전환 가능)'
+    });
+  }
+
+  // 4. 에디터 열기
+  function showEditor(doc = null) {
+    document.getElementById('editor-area').classList.remove('hidden');
+    
+    if (doc) {
+      document.getElementById('editor-header-title').innerText = '문서 수정';
+      state.currentDocId = doc.id;
+      document.getElementById('e-title').value = doc.title;
+      document.getElementById('e-category').value = doc.category;
+      editor.setMarkdown(doc.content || '');
+    } else {
+      document.getElementById('editor-header-title').innerText = '새 문서 작성';
+      state.currentDocId = null;
+      document.getElementById('e-title').value = '';
+      document.getElementById('e-category').value = '';
+      editor.setMarkdown('');
+    }
+    
+    setTimeout(() => editor.focus(), 100);
+  }
+
+  function hideEditor() {
+    document.getElementById('editor-area').classList.add('hidden');
+  }
+
+  // 5. 저장 로직
+  function handleSave() {
+    const title = document.getElementById('e-title').value.trim();
+    const content = editor.getMarkdown().trim(); 
+    const category = document.getElementById('e-category').value.trim() || '미분류';
+    
+    if (!title) { alert("문서 제목을 입력해주세요."); return; }
+    if (!content) { alert("본문 내용을 입력해주세요."); return; }
+
+    const payload = {
+      id: state.currentDocId,
+      title: title,
+      category: category,
+      content: content,
+      format: 'markdown'
+    };
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.innerText = '저장 중...';
+    saveBtn.disabled = true;
+    document.body.style.cursor = 'wait';
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        saveBtn.innerText = '저장하기';
+        saveBtn.disabled = false;
+        document.body.style.cursor = 'default';
+        
+        if (res.success) {
+          hideEditor();
+          loadData(res.id); 
+        } else {
+          alert('저장 실패: ' + res.error); 
+        }
+      })
+      .withFailureHandler((err) => {
+        saveBtn.innerText = '저장하기';
+        saveBtn.disabled = false;
+        document.body.style.cursor = 'default';
+        alert('서버 통신 오류: ' + err.message);
+      })
+      .saveDoc(payload);
+  }
+
+  // 6. 삭제 로직
+  function handleDelete(docId, docTitle) {
+    if (!confirm(`"${docTitle}" 문서를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
+
+    document.body.style.cursor = 'wait';
+    google.script.run
+      .withSuccessHandler(res => {
+        document.body.style.cursor = 'default';
+        if (res.success) {
+          document.getElementById('doc-viewer').classList.add('hidden');
+          document.getElementById('welcome-screen').classList.remove('hidden');
+          loadData();
+        } else {
+          alert('삭제 실패: ' + res.error);
+        }
+      })
+      .withFailureHandler(err => {
+        document.body.style.cursor = 'default';
+        alert('서버 오류: ' + err.message);
+      })
+      .deleteDoc(docId);
+  }
+
+  // 7. UI 렌더링 로직
+  function renderCategories() {
+    const list = document.getElementById('category-list');
+    list.innerHTML = `<div class="mb-4 text-xs text-slate-400 uppercase font-bold tracking-widest">분류</div>`;
+    
+    const allDiv = document.createElement('div');
+    allDiv.className = "cursor-pointer py-2 px-3 rounded-lg hover:bg-slate-800 transition mb-1 text-sm font-medium";
+    allDiv.innerText = `전체보기 (${state.docs.length})`;
+    allDiv.onclick = () => {
+      document.getElementById('doc-viewer').classList.add('hidden');
+      renderDocList(state.docs);
+    };
+    list.appendChild(allDiv);
+
+    state.categories.forEach(cat => {
+      const count = state.docs.filter(d => d.category === cat).length;
+      const div = document.createElement('div');
+      div.className = "cursor-pointer py-2 px-3 rounded-lg hover:bg-slate-800 transition mb-1 text-sm text-slate-300";
+      div.innerText = `${cat} (${count})`;
+      div.onclick = () => {
+        document.getElementById('doc-viewer').classList.add('hidden');
+        renderDocList(state.docs.filter(d => d.category === cat));
+      };
+      list.appendChild(div);
+    });
+  }
+
+  function renderDocList(docs) {
+    const docList = document.getElementById('doc-list');
+    const welcome = document.getElementById('welcome-screen');
+    const viewer = document.getElementById('doc-viewer');
+    
+    viewer.classList.add('hidden');
+    
+    if (docs.length === 0) {
+      docList.classList.add('hidden');
+      welcome.classList.remove('hidden');
+      return;
+    }
+    
+    welcome.classList.add('hidden');
+    docList.classList.remove('hidden');
+    
+    let html = '';
+    docs.forEach(doc => {
+      const previewText = doc.content.replace(/[#*`>]/g, '').substring(0, 150) + '...';
+      const dateStr = new Date(doc.updated_at).toLocaleDateString();
+      
+      html += `
+        <div onclick="viewDoc('${doc.id}')" class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 cursor-pointer transition group">
+          <div class="flex justify-between items-center mb-2">
+            <span class="px-2.5 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-md uppercase tracking-wide">${doc.category}</span>
+            <span class="text-xs text-gray-400">${dateStr}</span>
+          </div>
+          <h3 class="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition">${doc.title}</h3>
+          <p class="text-gray-500 text-sm mt-3 line-clamp-2 leading-relaxed">${previewText}</p>
+        </div>`;
+    });
+    docList.innerHTML = html;
+  }
+
+  function viewDoc(id) {
+    const doc = state.docs.find(d => d.id === id);
+    if (!doc) return;
+
+    document.getElementById('welcome-screen').classList.add('hidden');
+    document.getElementById('doc-list').classList.add('hidden');
+    const viewerEl = document.getElementById('doc-viewer');
+    viewerEl.classList.remove('hidden');
+    
+    document.getElementById('v-title').innerText = doc.title;
+    const dateStr = new Date(doc.updated_at).toLocaleString();
+    document.getElementById('v-meta').innerHTML = `
+      <span class="bg-gray-100 px-2 py-1 rounded text-gray-600 font-medium">${doc.category}</span>
+      <span class="flex items-center">작성: ${doc.author}</span>
+      <span class="flex items-center">최종 수정: ${dateStr}</span>
+    `;
+    
+    const contentEl = document.getElementById('v-content');
+    contentEl.innerHTML = ''; 
+    viewerInstance = toastui.Editor.factory({
+      el: contentEl,
+      viewer: true,
+      initialValue: doc.content
+    });
+    
+    document.getElementById('edit-btn').onclick = () => showEditor(doc);
+    document.getElementById('delete-btn').onclick = () => handleDelete(doc.id, doc.title);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // 8. ✅ 토큰 분리 AND 검색 — 띄어쓰기로 끊긴 단어도 모두 포함된 문서만 결과에 표시
+  function handleSearch() {
+    const rawQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+    const type = document.getElementById('searchType').value;
+
+    // 검색어 없으면 전체 목록 복원
+    if (!rawQuery) {
+      document.getElementById('doc-viewer').classList.add('hidden');
+      renderDocList(state.docs);
+      return;
+    }
+
+    // 공백 기준 토큰 분리, 빈 값 제거
+    const tokens = rawQuery.split(/\s+/).filter(t => t.length > 0);
+
+    const filtered = state.docs.filter(doc => {
+      const title = doc.title.toLowerCase();
+      const content = doc.content.toLowerCase();
+
+      // AND 조건: 모든 토큰이 매칭되어야 결과에 포함
+      return tokens.every(token => {
+        const inTitle   = title.includes(token);
+        const inContent = content.includes(token);
+        return type === 'title'   ? inTitle
+             : type === 'content' ? inContent
+             : (inTitle || inContent);
+      });
+    });
+
+    document.getElementById('doc-viewer').classList.add('hidden');
+    renderDocList(filtered);
+  }
+
+  function debounce(func, timeout = 300) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { func.apply(this, args); }, timeout);
+    };
+  }
+</script>
+</body>
+</html>
